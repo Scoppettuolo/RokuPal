@@ -1,0 +1,5 @@
+name = RokuPal Core
+description = Core utilities for RokuPal 1.0: modules manager, blocks, frontpage, theme defaults.
+package = RokuPal
+core = 6.x
+version = "1.0.0"

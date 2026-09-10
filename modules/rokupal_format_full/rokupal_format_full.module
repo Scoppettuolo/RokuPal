@@ -1,0 +1,40 @@
+<?php
+/**
+ * Optional Full HTML input format.
+ */
+function rokupal_format_full_enable() {
+  rokupal_format_full_ensure();
+}
+function rokupal_format_full_ensure() {
+  $roles = ',' . DRUPAL_AUTHENTICATED_RID . ',';
+  $fmt = db_result(db_query("SELECT format FROM {filter_formats} WHERE name = 'Full HTML'"));
+  if (!$fmt) {
+    db_query("INSERT INTO {filter_formats} (name, roles, cache) VALUES ('%s', '%s', %d)", 'Full HTML', $roles, 1);
+    $fmt = db_last_insert_id('filter_formats', 'format');
+    db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, 'filter', 2, 0)", $fmt);
+    db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, 'filter', 1, 1)", $fmt);
+    db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, 'filter', 3, 10)", $fmt);
+  }
+  else {
+    db_query("UPDATE {filter_formats} SET roles = '%s' WHERE format = %d", $roles, $fmt);
+  }
+  variable_set('rokupal_format_full_id', $fmt);
+  return $fmt;
+}
+function rokupal_format_full_disable() {
+  $fmt = variable_get('rokupal_format_full_id', 0);
+  if (!$fmt) {
+    $fmt = db_result(db_query("SELECT format FROM {filter_formats} WHERE name = 'Full HTML'"));
+  }
+  if ($fmt && $fmt != variable_get('filter_default_format', 0)) {
+    db_query("UPDATE {filter_formats} SET roles = ',' WHERE format = %d", $fmt);
+  }
+}
+function rokupal_format_full_uninstall() {
+  $fmt = db_result(db_query("SELECT format FROM {filter_formats} WHERE name = 'Full HTML'"));
+  if ($fmt && $fmt != variable_get('filter_default_format', 0)) {
+    db_query("DELETE FROM {filters} WHERE format = %d", $fmt);
+    db_query("DELETE FROM {filter_formats} WHERE format = %d", $fmt);
+  }
+  variable_del('rokupal_format_full_id');
+}

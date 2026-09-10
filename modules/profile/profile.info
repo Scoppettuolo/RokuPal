@@ -1,0 +1,5 @@
+name = Profile
+description = User profile fields for RokuPal (bio, location, website, custom fields). Manage at admin/user/profile.
+package = RokuPal
+core = 6.x
+version = "1.0.0"

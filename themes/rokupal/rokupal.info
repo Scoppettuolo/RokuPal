@@ -1,0 +1,32 @@
+name = RokuPal
+description = Official RokuPal 1.0 theme. Configure colors at admin/settings/color.
+core = 6.x
+version = "1.0.0"
+engine = phptemplate
+stylesheets[all][] = style.css
+
+; Extra regions for flexible block placement
+regions[header] = Header
+regions[header_first] = Header first
+regions[header_second] = Header second
+regions[highlighted] = Highlighted
+regions[content_top] = Content top
+regions[content] = Content
+regions[content_bottom] = Content bottom
+regions[left] = Left sidebar
+regions[right] = Right sidebar
+regions[sidebar_first] = Sidebar first (alias)
+regions[sidebar_second] = Sidebar second (alias)
+regions[footer_top] = Footer top
+regions[footer] = Footer
+regions[footer_first] = Footer first
+regions[footer_second] = Footer second
+regions[footer_third] = Footer third
+
+features[] = logo
+features[] = name
+features[] = slogan
+features[] = mission
+features[] = favicon
+features[] = primary_links
+features[] = secondary_links

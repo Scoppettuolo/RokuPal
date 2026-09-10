@@ -1,0 +1,6 @@
+name = RokuPal Poll
+description = Simple polls and voting.
+package = RokuPal
+core = 6.x
+version = "1.0.0"
+dependencies[] = node

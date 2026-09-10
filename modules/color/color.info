@@ -1,0 +1,5 @@
+name = Color
+description = Change RokuPal theme colors (header, footer, posts, links) via CSS variables.
+package = RokuPal
+core = 6.x
+version = "1.0.0"

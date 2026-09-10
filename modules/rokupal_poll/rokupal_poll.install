@@ -1,0 +1,47 @@
+<?php
+function rokupal_poll_schema() {
+  return array(
+    'rokupal_poll_meta' => array(
+      'description' => 'RokuPal poll marker.',
+      'fields' => array(
+        'mid' => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+        'name' => array('type' => 'varchar', 'length' => 64, 'not null' => TRUE, 'default' => ''),
+      ),
+      'primary key' => array('mid'),
+    ),
+  );
+}
+function rokupal_poll_install() {
+  drupal_install_schema('rokupal_poll');
+  @db_query("INSERT INTO {rokupal_poll_meta} (name) VALUES ('installed')");
+  if (!node_get_types('type', 'poll_choice')) {
+    $obj = (object) array(
+      'type' => 'poll_choice',
+      'name' => 'Poll',
+      'module' => 'node',
+      'description' => 'Encuesta simple.',
+      'has_title' => 1,
+      'title_label' => 'Question',
+      'has_body' => 1,
+      'body_label' => 'Choices (one per line)',
+      'min_word_count' => 0,
+      'custom' => 1,
+      'modified' => 1,
+      'locked' => 0,
+      'help' => '',
+    );
+    node_type_save($obj);
+    variable_set('node_options_poll_choice', array('status', 'promote'));
+    variable_set('comment_poll_choice', 0);
+  }
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_poll', 0);
+  }
+}
+function rokupal_poll_uninstall() {
+  drupal_uninstall_schema('rokupal_poll');
+  variable_del('rokupal_poll_version');
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_poll', SCHEMA_UNINSTALLED);
+  }
+}

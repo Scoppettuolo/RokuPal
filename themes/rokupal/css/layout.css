@@ -1,0 +1,54 @@
+/* RokuPal layout */
+.rp-page { min-height: 100vh; display: flex; flex-direction: column; }
+.rp-header {
+  background: var(--rp-brand);
+  color: #eee;
+  padding: 1rem 1.25rem;
+}
+.rp-header a { color: #9cf; }
+.rp-header-inner { max-width: var(--rp-max); margin: 0 auto; }
+.rp-brand { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem 1rem; }
+.rp-site-name { font-size: 1.4rem; font-weight: 700; color: #fff !important; text-decoration: none !important; }
+.rp-slogan { color: #aab; font-size: .9rem; }
+.rp-nav { margin-top: .75rem; }
+.rp-links { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; }
+.rp-links a { color: #cde; }
+
+.rp-main {
+  flex: 1;
+  max-width: var(--rp-max);
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.25rem;
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 900px) {
+  .rp-main.has-first { grid-template-columns: 220px 1fr; }
+  .rp-main.has-second { grid-template-columns: 1fr 220px; }
+  .rp-main.has-first.has-second { grid-template-columns: 200px 1fr 200px; }
+  .rp-sidebar-first { grid-column: 1; }
+  .rp-content { grid-column: 2; }
+  .rp-main.has-first.has-second .rp-content { grid-column: 2; }
+  .rp-sidebar-second { grid-column: 3; }
+  .rp-main.has-second:not(.has-first) .rp-content { grid-column: 1; }
+  .rp-main.has-second:not(.has-first) .rp-sidebar-second { grid-column: 2; }
+}
+
+.rp-content {
+  background: var(--rp-surface);
+  border-radius: var(--rp-radius);
+  box-shadow: var(--rp-shadow);
+  padding: 1.25rem 1.5rem;
+}
+.rp-title { margin-top: 0; }
+.rp-footer {
+  background: var(--rp-brand);
+  color: #bbb;
+  padding: 1.25rem;
+  font-size: .9rem;
+  margin-top: auto;
+}
+.rp-footer a { color: #9cf; }
+.rp-footer-region, .rp-footer-message { max-width: var(--rp-max); margin: 0 auto; }

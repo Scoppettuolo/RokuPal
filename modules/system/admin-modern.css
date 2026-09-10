@@ -1,0 +1,224 @@
+/* Admin UI modern layer for Drupal 6 fork — loaded after admin.css */
+:root {
+  --admin-radius: 8px;
+  --admin-border: #e2e8f0;
+  --admin-bg: #f8fafc;
+  --admin-primary: #4f46e5;
+  --admin-text: #0f172a;
+  --admin-muted: #64748b;
+  --admin-font: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+body.admin,
+body.section-admin {
+  font-family: var(--admin-font) !important;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--admin-text);
+  background: var(--admin-bg);
+}
+
+/* Compact tables */
+table.system-status-report,
+table.sticky-enabled,
+#system-modules table,
+#system-themes-form table,
+.admin-list {
+  border-collapse: collapse;
+  width: 100%;
+}
+table.system-status-report td,
+table.system-status-report th,
+#system-modules td,
+#system-modules th {
+  padding: 0.55rem 0.75rem;
+  border-color: var(--admin-border);
+}
+table.system-status-report tr.ok { background: #ecfdf5; }
+table.system-status-report tr.warning { background: #fffbeb; }
+table.system-status-report tr.error { background: #fef2f2; }
+
+/* Buttons */
+.form-submit,
+input[type="submit"],
+a.button {
+  border-radius: var(--admin-radius) !important;
+  padding: 0.45rem 1rem !important;
+  font-weight: 600 !important;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: var(--admin-primary);
+  color: #fff !important;
+}
+.form-submit:hover,
+input[type="submit"]:hover {
+  filter: brightness(0.92);
+}
+
+/* Form controls */
+input.form-text,
+textarea.form-textarea,
+select.form-select {
+  border-radius: 6px !important;
+  border: 1px solid var(--admin-border) !important;
+  padding: 0.4rem 0.65rem !important;
+  font: inherit !important;
+  max-width: 100%;
+}
+input.form-text:focus,
+textarea.form-textarea:focus,
+select.form-select:focus {
+  outline: 2px solid rgba(79, 70, 229, 0.35);
+  border-color: var(--admin-primary) !important;
+}
+
+/* Tabs */
+ul.primary {
+  border-bottom: 1px solid var(--admin-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+ul.primary li {
+  float: none !important;
+  display: inline-block;
+  margin: 0 !important;
+}
+ul.primary li a {
+  border-radius: 6px 6px 0 0 !important;
+  padding: 0.45rem 0.9rem !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-bottom: none !important;
+}
+ul.primary li.active a,
+ul.primary li a:hover {
+  background: #fff !important;
+  border-color: var(--admin-border) !important;
+  border-bottom-color: #fff !important;
+}
+
+/* Status messages */
+div.messages {
+  border-radius: var(--admin-radius);
+  padding: 0.85rem 1.1rem;
+  border-width: 1px;
+  border-style: solid;
+}
+div.status { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; }
+div.warning { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+div.error { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+
+/* Help / description */
+.form-item .description,
+.help {
+  color: var(--admin-muted);
+  font-size: 0.875rem;
+}
+
+/* Module list cleaner */
+#system-modules .package {
+  background: #fff;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+#system-modules h3 {
+  background: #f1f5f9;
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.95rem;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+/* Hide noisy update icons if any remain */
+.update .version-links a[href*="drupal.org"],
+.admin .update-nag,
+div.warning a[href*="drupal.org/project"] {
+  /* keep links usable but reduce visual weight */
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+/* Stronger admin modernization pass */
+body.admin #wrapper,
+body.section-admin #wrapper {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+body.admin h1, body.admin h2, body.admin h3,
+body.section-admin h1, body.section-admin h2 {
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+/* Permission matrix readability */
+#permissions td.permission {
+  font-size: 0.9rem;
+}
+#permissions tr.odd, #permissions tr.even {
+  border-bottom: 1px solid #e2e8f0;
+}
+/* Module page checkbox column */
+#system-modules td.checkbox {
+  width: 3rem;
+}
+/* Cleaner breadcrumb */
+.breadcrumb {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-bottom: 0.75rem;
+}
+.breadcrumb a { color: #4f46e5; }
+/* Local tasks secondary */
+ul.secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border: 0;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+ul.secondary li {
+  float: none !important;
+  display: inline-block;
+  margin: 0 !important;
+  border: 0 !important;
+}
+ul.secondary a {
+  display: block;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155 !important;
+  text-decoration: none;
+}
+ul.secondary a:hover,
+ul.secondary li.active a {
+  background: #4f46e5;
+  color: #fff !important;
+}
+/* Status report icons spacing */
+table.system-status-report .status-icon {
+  vertical-align: middle;
+}
+/* Help block less noisy */
+div.help {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.85rem 1.1rem;
+  color: #475569;
+  font-size: 0.9rem;
+}
+div.help a[href*="drupal.org"] {
+  color: #64748b;
+  text-decoration: underline;
+}
+/* Hide Powered by image remnants */
+.site-credit, #block-system-0 .content img {
+  opacity: 0.7;
+  font-size: 0.8rem;
+}

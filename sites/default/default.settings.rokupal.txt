@@ -1,0 +1,6 @@
+# Añadir al FINAL de sites/default/settings.php (después de instalar):
+#
+# // RokuPal session (localhost / XAMPP) — evita deslogueo post-install
+# ini_set('session.cookie_path', '/');
+# // NO definir $cookie_domain en localhost
+# // $base_url = 'http://localhost/Drupal6';  // descomentar y ajustar si hace falta

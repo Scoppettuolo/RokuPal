@@ -1,0 +1,39 @@
+<?php
+function rokupal_markdown_schema() {
+  return array(
+    'rokupal_markdown_meta' => array(
+      'description' => 'Markdown install marker',
+      'fields' => array(
+        'mid' => array('type' => 'serial', 'not null' => TRUE, 'unsigned' => TRUE),
+        'name' => array('type' => 'varchar', 'length' => 64, 'not null' => TRUE, 'default' => ''),
+      ),
+      'primary key' => array('mid'),
+    ),
+  );
+}
+
+function rokupal_markdown_install() {
+  drupal_install_schema('rokupal_markdown');
+  @db_query("INSERT INTO {rokupal_markdown_meta} (name) VALUES ('installed')");
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_markdown', 0);
+  }
+  if (function_exists('rokupal_markdown_ensure_format')) {
+    rokupal_markdown_ensure_format();
+  }
+}
+
+function rokupal_markdown_uninstall() {
+  if (db_table_exists('filters')) {
+    db_query("DELETE FROM {filters} WHERE module = 'rokupal_markdown'");
+  }
+  $fid = variable_get('rokupal_markdown_format', 0);
+  if ($fid && db_table_exists('filter_formats')) {
+    db_query("DELETE FROM {filter_formats} WHERE format = %d AND name = 'Markdown'", $fid);
+  }
+  variable_del('rokupal_markdown_format');
+  drupal_uninstall_schema('rokupal_markdown');
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_markdown', SCHEMA_UNINSTALLED);
+  }
+}

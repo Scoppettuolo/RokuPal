@@ -1,0 +1,16 @@
+.rp-menu-wrap { max-width: 900px; margin: 0 auto 2rem; font-family: system-ui, sans-serif; }
+.rp-menu-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.75rem; }
+.rp-menu-card { background: #fff; border: 1px solid #dde3ea; border-radius: 10px; padding: 1rem; }
+.rp-menu-card h2 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+.rp-menu-card code { font-size: 0.75rem; color: #888; }
+.rp-menu-add, .rp-menu-links { background: #fff; border: 1px solid #dde3ea; border-radius: 10px; padding: 1rem; margin: 1rem 0; }
+.rp-menu-table { width: 100%; border-collapse: collapse; }
+.rp-menu-table th, .rp-menu-table td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid #eee; }
+.rp-menu-table tr.is-hidden { opacity: 0.5; }
+.rp-w { width: 4rem; }
+.rp-btn { border: 0; border-radius: 6px; padding: 0.35rem 0.7rem; font-weight: 600; cursor: pointer; font-size: 0.85rem; text-decoration: none; display: inline-block; }
+.rp-btn-primary { background: #2f9e44; color: #fff; }
+.rp-btn-mute { background: #e9ecef; color: #333; }
+.rp-btn-danger { background: #fff5f5; color: #c92a2a; border: 1px solid #ffc9c9; }
+form.inline { display: inline; }
+.rp-menu-row-act { margin: 0.35rem 0; }

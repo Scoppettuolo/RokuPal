@@ -1,0 +1,12 @@
+<?php
+function color_install() {
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('color', 0);
+  }
+}
+function color_uninstall() {
+  variable_del('color_rokupal_palette');
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('color', SCHEMA_UNINSTALLED);
+  }
+}

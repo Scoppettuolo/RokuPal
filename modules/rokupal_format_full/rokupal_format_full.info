@@ -1,0 +1,6 @@
+name = Full HTML format
+description = Optional Full HTML input format (enable only if you need unrestricted HTML).
+package = RokuPal
+core = 6.x
+version = "1.0.0"
+dependencies[] = filter

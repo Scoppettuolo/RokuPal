@@ -1,0 +1,411 @@
+<?php
+/**
+ * @file
+ * Color for RokuPal — CSS custom properties only (no image recolor, no Garland).
+ */
+
+function color_boot() {
+}
+
+function color_menu() {
+  $items = array();
+  $items['admin/settings/color'] = array(
+    'title' => 'Colores del sitio',
+    'description' => 'Fondo, encabezado, pie, posts y enlaces (tema RokuPal).',
+    'page callback' => 'color_rokupal_page',
+    'page arguments' => array(),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+
+function color_help($path, $arg) {
+  if ($path == 'admin/help#color') {
+    return t('Color adjusts RokuPal theme colors via CSS variables. Go to <a href="@u">Site colors</a>.', array('@u' => url('admin/settings/color')));
+  }
+}
+
+/**
+ * Default RokuPal palette.
+ */
+function color_default_palette() {
+  return array(
+    'bg' => '#eef1f5',
+    'surface' => '#ffffff',
+    'text' => '#1a1d23',
+    'muted' => '#5c6570',
+    'header' => '#1a1a2e',
+    'header_text' => '#eeeeee',
+    'header_link' => '#99ccff',
+    'footer' => '#1a1a2e',
+    'footer_text' => '#aaaaaa',
+    'accent' => '#3b5675',
+    'link' => '#0b5cab',
+    'post_bg' => '#ffffff',
+    'post_border' => '#d5dbe3',
+    'sidebar_bg' => '#ffffff',
+    'border' => '#d5dbe3',
+  );
+}
+
+function color_get_palette() {
+  $saved = variable_get('color_rokupal_palette', array());
+  if (!is_array($saved)) {
+    $saved = array();
+  }
+  return array_merge(color_default_palette(), $saved);
+}
+
+function color_palette_labels() {
+  return array(
+    'bg' => t('Page background'),
+    'surface' => t('Main content background'),
+    'text' => t('Body text'),
+    'muted' => t('Muted text'),
+    'header' => t('Header background'),
+    'header_text' => t('Header text'),
+    'header_link' => t('Header links'),
+    'footer' => t('Footer background'),
+    'footer_text' => t('Footer text'),
+    'accent' => t('Accent / buttons'),
+    'link' => t('Links'),
+    'post_bg' => t('Post / card background'),
+    'post_border' => t('Post border'),
+    'sidebar_bg' => t('Sidebar background'),
+    'border' => t('General borders'),
+  );
+}
+
+/**
+ * Admin form.
+ */
+function color_palette_form(&$form_state) {
+  $palette = color_get_palette();
+  $labels = color_palette_labels();
+
+  $form = array();
+  $form['intro'] = array(
+    '#value' => '<p>' . t('These colors apply to the <strong>RokuPal</strong> theme only. Values must be valid CSS colors (e.g. <code>#1a1a2e</code> or <code>rgb(26,26,46)</code>).') . '</p>',
+  );
+
+  $form['palette'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Palette'),
+    '#tree' => TRUE,
+  );
+
+  foreach ($labels as $key => $label) {
+    $form['palette'][$key] = array(
+      '#type' => 'textfield',
+      '#title' => $label,
+      '#default_value' => isset($palette[$key]) ? $palette[$key] : '',
+      '#size' => 12,
+      '#maxlength' => 32,
+      '#attributes' => array('class' => 'color-hex-field', 'style' => 'font-family:monospace'),
+      '#description' => '<span class="color-swatch" style="display:inline-block;width:1.25rem;height:1.25rem;border:1px solid #999;vertical-align:middle;background:' . check_plain($palette[$key]) . '"></span>',
+    );
+  }
+
+  $form['preview'] = array(
+    '#value' => color_preview_html($palette),
+  );
+
+  $form['submit'] = array('#type' => 'submit', '#value' => t('Save colors'));
+  $form['reset'] = array(
+    '#type' => 'submit',
+    '#value' => t('Reset to defaults'),
+    '#submit' => array('color_palette_form_reset'),
+  );
+  return $form;
+}
+
+function color_palette_form_validate($form, &$form_state) {
+  if (empty($form_state['values']['palette']) || !is_array($form_state['values']['palette'])) {
+    return;
+  }
+  foreach ($form_state['values']['palette'] as $key => $color) {
+    $color = trim($color);
+    if ($color === '') {
+      form_set_error('palette][' . $key, t('Color cannot be empty.'));
+      continue;
+    }
+    // Allow #rgb, #rrggbb, rgb(), rgba(), hsl(), named colors (simple check)
+    if (!preg_match('/^(#([0-9a-f]{3}|[0-9a-f]{6})|rgba?\([^)]+\)|hsla?\([^)]+\)|[a-z]+)$/i', $color)) {
+      form_set_error('palette][' . $key, t('%c is not a valid CSS color.', array('%c' => $color)));
+    }
+  }
+}
+
+function color_palette_form_submit($form, &$form_state) {
+  $palette = array();
+  foreach (color_default_palette() as $key => $default) {
+    if (isset($form_state['values']['palette'][$key])) {
+      $palette[$key] = trim($form_state['values']['palette'][$key]);
+    }
+    else {
+      $palette[$key] = $default;
+    }
+  }
+  variable_set('color_rokupal_palette', $palette);
+  cache_clear_all();
+  drupal_set_message(t('Site colors saved. Reload the front page to see them.'));
+}
+
+function color_palette_form_reset($form, &$form_state) {
+  variable_del('color_rokupal_palette');
+  cache_clear_all();
+  drupal_set_message(t('Colors reset to RokuPal defaults.'));
+  $form_state['redirect'] = 'admin/settings/color';
+}
+
+function color_preview_html($palette) {
+  $p = $palette;
+  $html = '<div class="color-preview-board" style="margin:1rem 0;border:1px solid #ccc;border-radius:8px;overflow:hidden;font-family:system-ui,sans-serif">';
+  $html .= '<div style="background:' . check_plain($p['header']) . ';color:' . check_plain($p['header_text']) . ';padding:0.75rem 1rem"><strong>Header</strong> · <span style="color:' . check_plain($p['header_link']) . '">link</span></div>';
+  $html .= '<div style="display:flex;background:' . check_plain($p['bg']) . ';min-height:120px">';
+  $html .= '<div style="width:30%;background:' . check_plain($p['sidebar_bg']) . ';border-right:1px solid ' . check_plain($p['border']) . ';padding:0.5rem;color:' . check_plain($p['text']) . ';font-size:0.85rem">Sidebar</div>';
+  $html .= '<div style="flex:1;padding:0.75rem"><div style="background:' . check_plain($p['post_bg']) . ';border:1px solid ' . check_plain($p['post_border']) . ';border-radius:6px;padding:0.75rem;color:' . check_plain($p['text']) . '"><strong>Post title</strong><p style="margin:0.35rem 0 0;color:' . check_plain($p['muted']) . ';font-size:0.9rem">Body text. <a href="#" style="color:' . check_plain($p['link']) . '">Link</a></p><span style="display:inline-block;margin-top:0.5rem;padding:0.25rem 0.6rem;background:' . check_plain($p['accent']) . ';color:#fff;border-radius:4px;font-size:0.8rem">Button</span></div></div>';
+  $html .= '</div>';
+  $html .= '<div style="background:' . check_plain($p['footer']) . ';color:' . check_plain($p['footer_text']) . ';padding:0.6rem 1rem;font-size:0.85rem">Footer</div>';
+  $html .= '</div>';
+  return $html;
+}
+
+/**
+ * Inject CSS variables into every page when RokuPal is default theme.
+ */
+function color_preprocess_page(&$vars) {
+  $theme = variable_get('theme_default', 'rokupal');
+  if ($theme != 'rokupal') {
+    return;
+  }
+  $css = color_build_css();
+  if ($css !== '') {
+    drupal_set_html_head('<style type="text/css" id="rokupal-color-vars">' . $css . '</style>');
+  }
+}
+
+function color_css_string() {
+  return color_build_css();
+}
+
+function color_build_css() {
+  $p = color_get_palette();
+  $map = array(
+    '--rp-bg' => $p['bg'],
+    '--rp-surface' => $p['surface'],
+    '--rp-text' => $p['text'],
+    '--rp-muted' => $p['muted'],
+    '--rp-brand' => $p['header'],
+    '--rp-header-text' => $p['header_text'],
+    '--rp-header-link' => $p['header_link'],
+    '--rp-footer-bg' => $p['footer'],
+    '--rp-footer-text' => $p['footer_text'],
+    '--rp-accent' => $p['accent'],
+    '--rp-link' => $p['link'],
+    '--rp-post-bg' => $p['post_bg'],
+    '--rp-post-border' => $p['post_border'],
+    '--rp-sidebar-bg' => $p['sidebar_bg'],
+    '--rp-border' => $p['border'],
+  );
+  $lines = array(':root {');
+  foreach ($map as $var => $val) {
+    $lines[] = '  ' . $var . ': ' . $val . ';';
+  }
+  $lines[] = '}';
+  return implode("\n", $lines);
+}
+
+/**
+ * Also attach via init for pages that skip preprocess_page edge cases.
+ */
+function color_init() {
+  static $done = FALSE;
+  if ($done) {
+    return;
+  }
+  $done = TRUE;
+  if (variable_get('theme_default', 'rokupal') != 'rokupal') {
+    return;
+  }
+  if (!function_exists('drupal_set_html_head')) {
+    return;
+  }
+  $css = color_build_css();
+  if ($css !== '') {
+    drupal_set_html_head('<style type="text/css" id="rokupal-color-vars">' . $css . '</style>');
+  }
+}
+
+
+/**
+ * Attach palette to RokuPal theme settings + ensure menu link visible.
+ */
+function color_form_alter(&$form, $form_state, $form_id) {
+  if ($form_id != 'system_theme_settings') {
+    return;
+  }
+  // Only for rokupal theme
+  $theme = NULL;
+  if (!empty($form['#parameters'][1])) {
+    $theme = $form['#parameters'][1];
+  }
+  elseif (arg(3)) {
+    $theme = arg(3);
+  }
+  if ($theme !== 'rokupal') {
+    return;
+  }
+  $form['rokupal_color'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('RokuPal colors'),
+    '#description' => t('Or manage the full palette at <a href="@u">Site colors</a>.', array('@u' => url('admin/settings/color'))),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#weight' => -20,
+  );
+  $palette = color_get_palette();
+  $labels = color_palette_labels();
+  foreach ($labels as $key => $label) {
+    $form['rokupal_color'][$key] = array(
+      '#type' => 'textfield',
+      '#title' => $label,
+      '#default_value' => isset($palette[$key]) ? $palette[$key] : '',
+      '#size' => 12,
+      '#attributes' => array('style' => 'font-family:monospace'),
+    );
+  }
+  $form['#submit'][] = 'color_theme_settings_submit';
+}
+
+function color_theme_settings_submit($form, &$form_state) {
+  if (empty($form_state['values'])) {
+    return;
+  }
+  $labels = color_palette_labels();
+  $palette = color_get_palette();
+  foreach (array_keys($labels) as $key) {
+    if (isset($form_state['values'][$key]) && is_string($form_state['values'][$key])) {
+      $palette[$key] = trim($form_state['values'][$key]);
+    }
+  }
+  variable_set('color_rokupal_palette', $palette);
+  drupal_set_message(t('RokuPal colors updated.'));
+}
+
+
+/**
+ * Color admin with native HTML5 color pickers + hex fields.
+ */
+function color_rokupal_page() {
+  drupal_set_title(t('Site colors'));
+  $labels = color_palette_labels();
+  $palette = color_get_palette();
+
+  if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['color_save'])) {
+    if (!empty($_POST['token']) && function_exists('drupal_valid_token') && !drupal_valid_token($_POST['token'], 'rokupal_color')) {
+      drupal_set_message(t('Invalid token'), 'error');
+    }
+    else {
+      $new = $palette;
+      if (!empty($_POST['palette']) && is_array($_POST['palette'])) {
+        foreach ($labels as $key => $label) {
+          if (isset($_POST['palette'][$key])) {
+            $c = trim($_POST['palette'][$key]);
+            if ($c !== '' && preg_match('/^(#([0-9a-f]{3}|[0-9a-f]{6})|rgba?\([^)]+\)|hsla?\([^)]+\)|[a-z]+)$/i', $c)) {
+              $new[$key] = $c;
+            }
+            elseif (preg_match('/^#?[0-9a-f]{6}$/i', $c)) {
+              $new[$key] = (strpos($c, '#') === 0) ? $c : ('#' . $c);
+            }
+          }
+        }
+      }
+      // Also accept picker_* fields
+      if (!empty($_POST['picker']) && is_array($_POST['picker'])) {
+        foreach ($_POST['picker'] as $key => $c) {
+          if (isset($labels[$key]) && preg_match('/^#[0-9a-f]{6}$/i', $c)) {
+            $new[$key] = $c;
+          }
+        }
+      }
+      if (!empty($_POST['color_reset'])) {
+        $new = color_default_palette();
+      }
+      variable_set('color_rokupal_palette', $new);
+      if (function_exists('color_write_css_file')) {
+        color_write_css_file($new);
+      }
+      if (function_exists('drupal_clear_css_cache')) {
+        drupal_clear_css_cache();
+      }
+      cache_clear_all();
+      drupal_set_message(t('Colors saved.'));
+      $palette = $new;
+    }
+  }
+
+  $token = function_exists('drupal_get_token') ? drupal_get_token('rokupal_color') : '';
+  $css = drupal_get_path('module', 'color') . '/color-admin.css';
+  if (is_file($css)) {
+    drupal_add_css($css);
+  }
+  $js = drupal_get_path('module', 'color') . '/color-admin.js';
+  if (is_file($js)) {
+    drupal_add_js($js);
+  }
+
+  $out = '<div class="rp-color-wrap">';
+  $out .= '<p>' . t('Pick a color with the swatch or type a hex code. Applies to the RokuPal theme.') . '</p>';
+  $out .= '<form method="post" action="' . check_url(url('admin/settings/color')) . '" id="rp-color-form">';
+  $out .= '<input type="hidden" name="color_save" value="1" />';
+  if ($token) {
+    $out .= '<input type="hidden" name="token" value="' . check_plain($token) . '" />';
+  }
+  $out .= '<div class="rp-color-grid">';
+  foreach ($labels as $key => $label) {
+    $val = isset($palette[$key]) ? $palette[$key] : '#000000';
+    // Normalize to #rrggbb for input[type=color]
+    $hex = $val;
+    if (preg_match('/^#([0-9a-f]{3})$/i', $hex, $m)) {
+      $hex = '#' . $m[1][0].$m[1][0].$m[1][1].$m[1][1].$m[1][2].$m[1][2];
+    }
+    if (!preg_match('/^#[0-9a-f]{6}$/i', $hex)) {
+      $hex = '#888888';
+    }
+    $out .= '<label class="rp-color-row">';
+    $out .= '<span class="rp-color-label">' . check_plain($label) . '</span>';
+    $out .= '<input type="color" name="picker[' . check_plain($key) . ']" value="' . check_plain($hex) . '" class="rp-color-picker" data-key="' . check_plain($key) . '" />';
+    $out .= '<input type="text" name="palette[' . check_plain($key) . ']" value="' . check_plain($val) . '" class="rp-color-hex" data-key="' . check_plain($key) . '" maxlength="32" />';
+    $out .= '</label>';
+  }
+  $out .= '</div>';
+  $out .= '<p class="rp-color-actions">';
+  $out .= '<button type="submit" class="rp-btn rp-btn-primary">' . t('Save colors') . '</button> ';
+  $out .= '<button type="submit" name="color_reset" value="1" class="rp-btn rp-btn-mute">' . t('Reset defaults') . '</button>';
+  $out .= '</p></form>';
+  $out .= color_preview_html($palette);
+  $out .= '</div>';
+  return $out;
+}
+
+
+function color_write_css_file($palette = NULL) {
+  if ($palette === NULL) {
+    $palette = color_get_palette();
+  }
+  // Ensure color_get_palette uses latest
+  variable_set('color_rokupal_palette', $palette);
+  $css = color_build_css();
+  $dir = file_directory_path() . '/css';
+  if (function_exists('file_check_directory')) {
+    file_check_directory($dir, TRUE);
+  }
+  elseif (!is_dir($dir)) {
+    @mkdir($dir, 0775, TRUE);
+  }
+  $path = $dir . '/rokupal-color.css';
+  @file_put_contents($path, $css);
+  return $path;
+}

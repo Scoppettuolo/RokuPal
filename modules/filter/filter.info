@@ -1,0 +1,11 @@
+name = Filter
+description = Handles the filtering of content in preparation for display.
+package = Core - required
+version = "1.0.0"
+core = "6.x"
+
+; Information added by Drupal 6 LTS vendors on 2022-02-16
+version = "1.0.0"
+core = "6.x"
+project = "drupal"
+datestamp = "1645029306"

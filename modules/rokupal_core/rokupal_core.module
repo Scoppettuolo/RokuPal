@@ -1,0 +1,407 @@
+<?php
+/**
+ * @file
+ * RokuPal core — frontpage, welcome hide, block admin fixes, status report PHP 8.
+ */
+
+/**
+ * Implementation of hook_boot().
+ */
+function rokupal_core_boot() {
+  if (module_exists('rokupal_blog')) {
+    $fp = variable_get('site_frontpage', 'node');
+    if ($fp === 'node' || $fp === '') {
+      variable_set('site_frontpage', 'blog');
+    }
+  }
+}
+
+/**
+ * Implementation of hook_init().
+ */
+function rokupal_core_init() {
+  // Self-heal frontpage if set to missing path
+  $fp = variable_get('site_frontpage', 'node');
+  if ($fp === 'blog' && !module_exists('rokupal_blog')) {
+    variable_set('site_frontpage', 'node');
+  }
+
+  if (is_file('themes/rokupal/rokupal.info')) {
+    $td = variable_get('theme_default', 'rokupal');
+    if (in_array($td, array('garland', 'minnelli', 'pushbutton', 'chameleon', 'marvin', ''), TRUE)) {
+      variable_set('theme_default', 'rokupal');
+    }
+  }
+}
+
+/**
+ * Implementation of hook_menu_alter().
+ */
+function rokupal_core_menu_alter(&$items) {
+  if (isset($items['node']['page callback']) && $items['node']['page callback'] === 'node_page_default') {
+    $items['node']['page callback'] = 'rokupal_core_node_front';
+  }
+  // Replace archaic system modules UI with RokuPal modules manager.
+  if (isset($items['admin/build/modules'])) {
+    $items['admin/build/modules']['page callback'] = 'rokupal_core_modules_page';
+    $items['admin/build/modules']['page arguments'] = array();
+    $items['admin/build/modules']['file'] = 'rokupal_core.modules.inc';
+    $items['admin/build/modules']['file path'] = drupal_get_path('module', 'rokupal_core');
+    $items['admin/build/modules']['module'] = 'rokupal_core';
+  }
+  if (isset($items['admin/build/modules/list'])) {
+    $items['admin/build/modules/list']['page callback'] = 'rokupal_core_modules_page';
+    $items['admin/build/modules/list']['page arguments'] = array();
+    $items['admin/build/modules/list']['file'] = 'rokupal_core.modules.inc';
+    $items['admin/build/modules/list']['file path'] = drupal_get_path('module', 'rokupal_core');
+  }
+  if (isset($items['admin/build/modules/uninstall'])) {
+    $items['admin/build/modules/uninstall']['page callback'] = 'rokupal_core_modules_page';
+    $items['admin/build/modules/uninstall']['page arguments'] = array('uninstall');
+    $items['admin/build/modules/uninstall']['file'] = 'rokupal_core.modules.inc';
+    $items['admin/build/modules/list']['file path'] = drupal_get_path('module', 'rokupal_core');
+    $items['admin/build/modules/uninstall']['file path'] = drupal_get_path('module', 'rokupal_core');
+  }
+}
+
+/**
+ * Front listing when site_frontpage is still "node".
+ */
+function rokupal_core_node_front() {
+  global $user;
+  $result = pager_query(db_rewrite_sql('SELECT n.nid, n.sticky, n.created FROM {node} n WHERE n.promote = 1 AND n.status = 1 ORDER BY n.sticky DESC, n.created DESC'), variable_get('default_nodes_main', 10));
+  $output = '';
+  $num_rows = FALSE;
+  while ($row = db_fetch_object($result)) {
+    $output .= node_view(node_load($row->nid), 1);
+    $num_rows = TRUE;
+  }
+  if ($num_rows) {
+    return $output . theme('pager', NULL, variable_get('default_nodes_main', 10));
+  }
+  $is_admin = !empty($user->uid) && ($user->uid == 1 || user_access('administer site configuration'));
+  if (!$is_admin) {
+    if (module_exists('rokupal_blog')) {
+      return '<p>' . t('Visit the <a href="@blog">blog</a>.', array('@blog' => url('blog'))) . '</p>';
+    }
+    return '';
+  }
+  $msg = '<h1 class="title">' . t('RokuPal is ready') . '</h1>';
+  $msg .= '<p>' . t('You are logged in as administrator. This message is only visible to admins.') . '</p>';
+  $msg .= '<ul>';
+  if (module_exists('rokupal_blog')) {
+    $msg .= '<li>' . l(t('Go to the blog'), 'blog') . '</li>';
+    $msg .= '<li>' . l(t('Write a post'), 'node/add/blog-post') . '</li>';
+  }
+  $msg .= '<li>' . l(t('Administration'), 'admin') . '</li>';
+  $msg .= '</ul>';
+  return $msg;
+}
+
+/**
+ * Implementation of hook_preprocess_page().
+ */
+function rokupal_core_preprocess_page(&$vars) {
+  global $user;
+  if (empty($vars['content']) || !is_string($vars['content'])) {
+    return;
+  }
+  $is_admin = !empty($user->uid) && ($user->uid == 1 || user_access('administer site configuration'));
+  if ($is_admin) {
+    return;
+  }
+  if (stripos($vars['content'], 'Welcome to your new RokuPal website') !== FALSE
+      || stripos($vars['content'], 'Welcome to your site') !== FALSE) {
+    if (module_exists('rokupal_blog')) {
+      $vars['content'] = '<p>' . t('Visit the <a href="@blog">blog</a>.', array('@blog' => url('blog'))) . '</p>';
+    }
+    else {
+      $vars['content'] = '';
+    }
+  }
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function rokupal_core_menu() {
+  $items = array();
+  $items['admin/build/block/visual'] = array(
+    'title' => 'Visual layout',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('rokupal_core_block_visual_form'),
+    'access arguments' => array('administer blocks'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => -5,
+  );
+  return $items;
+}
+
+/**
+ * Implementation of hook_form_alter().
+ * Block admin: textfields for region/weight (no illegal choice), safe validate/submit.
+ */
+function rokupal_core_form_alter(&$form, $form_state, $form_id) {
+  // Collapsible comment form below posts
+  if ($form_id == 'comment_form') {
+    if (!(arg(0) == 'comment' && arg(1) == 'reply')) {
+      $form['#prefix'] = (isset($form['#prefix']) ? $form['#prefix'] : '') . '<div class="rp-comment-wrap is-collapsed" id="rp-comment-form-wrap">';
+      $form['#prefix'] .= '<button type="button" class="rp-comment-toggle" id="rp-comment-toggle" aria-expanded="false">' . t('Write a comment') . '</button>';
+      $form['#prefix'] .= '<div class="rp-comment-panel">';
+      $form['#suffix'] = '</div></div>' . (isset($form['#suffix']) ? $form['#suffix'] : '');
+      drupal_add_css(drupal_get_path('module', 'rokupal_core') . '/css/comment-form.css');
+      drupal_add_js(drupal_get_path('module', 'rokupal_core') . '/js/comment-form.js');
+    }
+    return;
+  }
+
+  if ($form_id != 'block_admin_display_form') {
+    return;
+  }
+
+  $path = drupal_get_path('module', 'rokupal_core');
+  if ($path) {
+    if (is_file($path . '/css/block-admin.css')) {
+      drupal_add_css($path . '/css/block-admin.css');
+    }
+    if (is_file($path . '/js/block-admin.js')) {
+      drupal_add_js($path . '/js/block-admin.js');
+    }
+  }
+  if (is_file('misc/tabledrag.js')) {
+    drupal_add_js('misc/tabledrag.js');
+  }
+  if (is_file('misc/block.js')) {
+    drupal_add_js('misc/block.js');
+  }
+
+  $map_legacy = array(
+    'sidebar_first' => 'left',
+    'sidebar_second' => 'right',
+    'sidebar-left' => 'left',
+    'sidebar-right' => 'right',
+    'top_bar' => 'header',
+    'header_tools' => 'header',
+    'footer_message' => 'footer',
+  );
+
+  foreach (element_children($form) as $key) {
+    if (!isset($form[$key]) || !is_array($form[$key]) || !isset($form[$key]['region'])) {
+      continue;
+    }
+
+    $cur = isset($form[$key]['region']['#default_value']) ? $form[$key]['region']['#default_value'] : '';
+    if ($cur === NULL || $cur === -1 || $cur === '-1') {
+      $cur = '';
+    }
+    $cur = (string) $cur;
+    if (isset($map_legacy[$cur])) {
+      $cur = $map_legacy[$cur];
+    }
+
+    $form[$key]['region'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Region'),
+      '#default_value' => $cur,
+      '#size' => 16,
+      '#maxlength' => 64,
+      '#description' => t('Regions: header, header_first, header_second, highlighted, content_top, content, content_bottom, left, right, footer_top, footer, footer_first, footer_second, footer_third. Empty = disabled.'),
+      '#attributes' => array('list' => 'rp-region-list', 'class' => 'rp-region-input'),
+    );
+
+    if (isset($form[$key]['weight'])) {
+      $w = isset($form[$key]['weight']['#default_value']) ? (int) $form[$key]['weight']['#default_value'] : 0;
+      $form[$key]['weight'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Weight'),
+        '#default_value' => $w,
+        '#size' => 4,
+        '#maxlength' => 5,
+      );
+    }
+  }
+
+  // PHP 8: #validate / #submit may be NULL — never array_unshift(NULL).
+  if (!isset($form['#validate']) || !is_array($form['#validate'])) {
+    $form['#validate'] = array();
+  }
+  $form['#validate'][] = 'rokupal_core_block_admin_validate';
+
+  if (!isset($form['#submit']) || !is_array($form['#submit'])) {
+    $form['#submit'] = array();
+  }
+  $form['#submit'][] = 'rokupal_core_block_admin_submit';
+
+  if (isset($form['submit']['#value'])) {
+    $form['submit']['#value'] = t('Save blocks');
+  }
+
+  $form['rp_region_datalist'] = array(
+    '#type' => 'markup',
+    '#value' => '<datalist id="rp-region-list"><option value="header"><option value="header_first"><option value="header_second"><option value="highlighted"><option value="content_top"><option value="content"><option value="content_bottom"><option value="left"><option value="right"><option value="footer_top"><option value="footer"><option value="footer_first"><option value="footer_second"><option value="footer_third"></datalist>',
+    '#weight' => -99,
+  );
+  $form['rokupal_visual_link'] = array(
+    '#type' => 'markup',
+    '#value' => '<p class="rp-block-admin-help">' . t('Also: <a href="@u">Visual layout</a>.', array('@u' => url('admin/build/block/visual'))) . '</p>',
+    '#weight' => -100,
+  );
+}
+
+/**
+ * Sanitize block admin values.
+ */
+function rokupal_core_block_admin_validate($form, &$form_state) {
+  if (empty($form_state['values']) || !is_array($form_state['values'])) {
+    return;
+  }
+  $map_legacy = array(
+    'sidebar_first' => 'left',
+    'sidebar_second' => 'right',
+    'sidebar-left' => 'left',
+    'sidebar-right' => 'right',
+    'top_bar' => 'header',
+    'header_tools' => 'header',
+  );
+  foreach ($form_state['values'] as $key => $row) {
+    if (!is_array($row) || !isset($row['region'])) {
+      continue;
+    }
+    $region = $row['region'];
+    if (isset($map_legacy[$region])) {
+      $form_state['values'][$key]['region'] = $map_legacy[$region];
+    }
+  }
+}
+
+/**
+ * Persist block layout to {blocks}.
+ */
+function rokupal_core_block_admin_submit($form, &$form_state) {
+  if (empty($form_state['values']) || !is_array($form_state['values'])) {
+    return;
+  }
+  $theme = variable_get('theme_default', 'rokupal');
+  $map_legacy = array(
+    'sidebar_first' => 'left',
+    'sidebar_second' => 'right',
+    'sidebar-left' => 'left',
+    'sidebar-right' => 'right',
+    'top_bar' => 'header',
+    'header_tools' => 'header',
+  );
+
+  foreach ($form_state['values'] as $key => $row) {
+    if (!is_array($row) || !isset($row['module']) || !isset($row['delta'])) {
+      continue;
+    }
+    if (isset($row['theme']) && $row['theme'] !== '') {
+      $theme = $row['theme'];
+    }
+    $module = $row['module'];
+    $delta = $row['delta'];
+    $region = isset($row['region']) ? trim($row['region']) : '';
+    if (isset($map_legacy[$region])) {
+      $region = $map_legacy[$region];
+    }
+    $weight = isset($row['weight']) ? (int) $row['weight'] : 0;
+    $throttle = isset($row['throttle']) ? (int) $row['throttle'] : 0;
+    if ($region === '' || $region === '-1') {
+      $status = 0;
+      $region = '';
+    }
+    else {
+      $status = 1;
+    }
+    db_query(
+      "UPDATE {blocks} SET status = %d, weight = %d, region = '%s', throttle = %d WHERE module = '%s' AND delta = '%s' AND theme = '%s'",
+      $status,
+      $weight,
+      $region,
+      $throttle,
+      $module,
+      $delta,
+      $theme
+    );
+  }
+  cache_clear_all();
+  drupal_set_message(t('The block settings have been updated.'));
+}
+
+/**
+ * Visual block layout form.
+ */
+function rokupal_core_block_visual_form(&$form_state) {
+  $theme=variable_get('theme_default','rokupal'); $path=drupal_get_path('module','rokupal_core');
+  if($path&&is_file($path.'/css/block-admin.css'))drupal_add_css($path.'/css/block-admin.css');
+  if($path&&is_file($path.'/js/block-admin.js'))drupal_add_js($path.'/js/block-admin.js');
+  $regions=array('preheader'=>'Preheader','header'=>'Header','header_tools'=>'Header tools','highlighted'=>'Highlighted','hero'=>'Hero','content_top'=>'Content top','content'=>'Content','content_bottom'=>'Content bottom','triptych_first'=>'Triptych first','triptych_middle'=>'Triptych middle','triptych_last'=>'Triptych last','left'=>'Left sidebar','right'=>'Right sidebar','footer_top'=>'Footer top','footer'=>'Footer','footer_bottom'=>'Footer bottom',''=>'Disabled');
+  $q=db_query("SELECT * FROM {blocks} WHERE theme = '%s' ORDER BY weight, module, delta",$theme); $all=array();
+  while($b=db_fetch_array($q)){ $key=$b['module'].'|'.$b['delta']; $list=module_invoke($b['module'],'block','list'); $info=(is_array($list)&&isset($list[$b['delta']]['info']))?$list[$b['delta']]['info']:$key; $reg=!empty($b['status'])?$b['region']:''; if(!isset($regions[$reg]))$reg=''; $all[$key]=array('module'=>$b['module'],'delta'=>$b['delta'],'info'=>$info,'region'=>$reg); }
+  $html='<div class="rp-block-admin-help"><strong>'.t('Visual layout').'</strong><br/>'.t('Arrastra cada bloque entre las regiones reales y pulsa Guardar layout.').'</div><div class="rp-layout-board rp-layout-draggable">';
+  foreach($regions as $rid=>$label){$html.='<section class="rp-region-box rp-dropzone" data-region="'.check_plain($rid).'"><h2>'.t($label).'</h2><div class="rp-dropzone-items">'; foreach($all as $key=>$b){if($b['region']!==$rid)continue; $html.='<article class="rp-block-card" draggable="true" data-block-key="'.check_plain($key).'"><span class="rp-drag-handle">☷</span><strong>'.check_plain($b['info']).'</strong><small>'.check_plain($key).'</small></article>';} $html.='</div></section>';}
+  $html.='</div>'; $form=array('#tree'=>TRUE); $form['board']=array('#type'=>'markup','#value'=>$html);
+  foreach($all as $key=>$b){$form['blocks'][$key]['module']=array('#type'=>'value','#value'=>$b['module']); $form['blocks'][$key]['delta']=array('#type'=>'value','#value'=>$b['delta']); $form['blocks'][$key]['region']=array('#type'=>'hidden','#default_value'=>$b['region'],'#attributes'=>array('class'=>array('rp-block-region')));}
+  $form['theme']=array('#type'=>'value','#value'=>$theme); $form['submit']=array('#type'=>'submit','#value'=>t('Save layout')); return $form;
+}
+
+function rokupal_core_block_visual_form_submit($form, &$form_state) {
+  if(empty($form_state['values']['blocks'])||!is_array($form_state['values']['blocks']))return; $theme=isset($form_state['values']['theme'])?$form_state['values']['theme']:variable_get('theme_default','rokupal'); $allowed=array('preheader','header','header_tools','highlighted','hero','content_top','content','content_bottom','triptych_first','triptych_middle','triptych_last','left','right','footer_top','footer','footer_bottom',''); $weights=array();
+  foreach($form_state['values']['blocks'] as $row){if(!is_array($row)||empty($row['module'])||!isset($row['delta']))continue; $r=isset($row['region'])?trim($row['region']):''; if(!in_array($r,$allowed,TRUE))$r=''; if(!isset($weights[$r]))$weights[$r]=0; db_query("UPDATE {blocks} SET region = '%s', status = %d, weight = %d WHERE module = '%s' AND delta = '%s' AND theme = '%s'",$r,$r===''?0:1,$weights[$r]++,$row['module'],$row['delta'],$theme);}
+  cache_clear_all(); drupal_set_message(t('Block layout saved.'));
+}
+/**
+ * Implementation of hook_theme().
+ */
+function rokupal_core_theme() {
+  return array(
+    'status_report' => array(
+      'arguments' => array('requirements' => NULL),
+    ),
+  );
+}
+
+/**
+ * PHP 8-safe status report.
+ */
+function rokupal_core_status_report($requirements) {
+  if (!defined('REQUIREMENT_INFO')) {
+    define('REQUIREMENT_INFO', -1);
+    define('REQUIREMENT_OK', 0);
+    define('REQUIREMENT_WARNING', 1);
+    define('REQUIREMENT_ERROR', 2);
+  }
+  $severities = array(
+    REQUIREMENT_INFO => 'info',
+    REQUIREMENT_OK => 'ok',
+    REQUIREMENT_WARNING => 'warning',
+    REQUIREMENT_ERROR => 'error',
+  );
+  $output = '<table class="system-status-report">';
+  if (!is_array($requirements)) {
+    $requirements = array();
+  }
+  foreach ($requirements as $requirement) {
+    if (!is_array($requirement)) {
+      continue;
+    }
+    $severity = isset($requirement['severity']) ? (int) $requirement['severity'] : 0;
+    $class = isset($severities[$severity]) ? $severities[$severity] : 'info';
+    $title = isset($requirement['title']) ? $requirement['title'] : '';
+    $value = isset($requirement['value']) ? $requirement['value'] : '';
+    $desc = isset($requirement['description']) ? $requirement['description'] : '';
+    if ($desc !== '') {
+      $output .= '<tr class="' . $class . ' merge-down"><th>' . $title . '</th><td>' . $value . '</td></tr>';
+      $output .= '<tr class="' . $class . ' merge-up"><td colspan="2">' . $desc . '</td></tr>';
+    }
+    else {
+      $output .= '<tr class="' . $class . '"><th>' . $title . '</th><td>' . $value . '</td></tr>';
+    }
+  }
+  $output .= '</table>';
+  return $output;
+}
+
+
+
+

@@ -1,0 +1,123 @@
+<?php
+function rokupal_blog_schema() {
+  return array(
+    'rokupal_blog_meta' => array(
+      'description' => 'RokuPal blog install marker.',
+      'fields' => array(
+        'mid' => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+        'name' => array('type' => 'varchar', 'length' => 64, 'not null' => TRUE, 'default' => ''),
+      ),
+      'primary key' => array('mid'),
+    ),
+  );
+}
+
+function rokupal_blog_install() {
+  drupal_install_schema('rokupal_blog');
+  @db_query("INSERT INTO {rokupal_blog_meta} (name) VALUES ('installed')");
+  rokupal_blog_ensure_type();
+  rokupal_blog_ensure_vocab();
+  rokupal_blog_setup_blocks();
+  variable_set('site_frontpage', 'blog');
+  variable_set('rokupal_blog_version', 1);
+  if (function_exists('drupal_set_installed_schema_version')) {
+    $v = drupal_get_schema_versions('rokupal_blog');
+    drupal_set_installed_schema_version('rokupal_blog', $v ? max($v) : 0);
+  }
+}
+
+function rokupal_blog_uninstall() {
+  drupal_uninstall_schema('rokupal_blog');
+  variable_del('rokupal_blog_version');
+  variable_del('rokupal_blog_vid');
+  if (variable_get('site_frontpage', '') == 'blog') {
+    variable_set('site_frontpage', 'node');
+  }
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_blog', SCHEMA_UNINSTALLED);
+  }
+}
+
+function rokupal_blog_ensure_type() {
+  $type = 'blog_post';
+  if (function_exists('node_get_types') && node_get_types('type', $type)) {
+    return;
+  }
+  $obj = (object) array(
+    'type' => $type,
+    'name' => 'Blog post',
+    'module' => 'node',
+    'description' => 'Entrada de blog.',
+    'has_title' => 1,
+    'title_label' => 'Title',
+    'has_body' => 1,
+    'body_label' => 'Body',
+    'min_word_count' => 0,
+    'custom' => 1,
+    'modified' => 1,
+    'locked' => 0,
+    'help' => '',
+  );
+  node_type_save($obj);
+  variable_set('node_options_blog_post', array('status', 'promote'));
+  variable_set('comment_blog_post', 2);
+  if (function_exists('node_types_rebuild')) {
+    node_types_rebuild();
+  }
+}
+
+function rokupal_blog_ensure_vocab() {
+  $vid = variable_get('rokupal_blog_vid', 0);
+  if ($vid && function_exists('taxonomy_vocabulary_load') && taxonomy_vocabulary_load($vid)) {
+    return;
+  }
+  $found = db_result(db_query("SELECT vid FROM {vocabulary} WHERE name = '%s' LIMIT 1", 'Categories'));
+  if ($found) {
+    variable_set('rokupal_blog_vid', (int) $found);
+    return;
+  }
+  $edit = array(
+    'name' => 'Categories',
+    'description' => 'Categorías del blog.',
+    'help' => '',
+    'tags' => 0,
+    'multiple' => 1,
+    'required' => 0,
+    'hierarchy' => 1,
+    'relations' => 0,
+    'module' => 'taxonomy',
+    'weight' => 0,
+    'nodes' => array('blog_post' => 1),
+  );
+  taxonomy_save_vocabulary($edit);
+  if (!empty($edit['vid'])) {
+    variable_set('rokupal_blog_vid', (int) $edit['vid']);
+    foreach (array('General', 'News', 'Tutorials') as $i => $name) {
+      $term = array('vid' => (int) $edit['vid'], 'name' => $name, 'description' => '', 'weight' => $i);
+      taxonomy_save_term($term);
+    }
+  }
+}
+
+function rokupal_blog_setup_blocks() {
+  $theme = variable_get('theme_default', 'rokupal');
+  $placements = array(
+    array('rokupal_blog', 'recent', 'right', 0),
+    array('rokupal_blog', 'categories', 'right', 1),
+    array('rokupal_blog', 'archive', 'right', 2),
+    array('rokupal_blog', 'meta', 'right', 3),
+    array('user', '1', 'left', 0),
+    array('user', '0', 'left', -5),
+  );
+  foreach ($placements as $b) {
+    db_query("DELETE FROM {blocks} WHERE module = '%s' AND delta = '%s' AND theme = '%s'", $b[0], $b[1], $theme);
+    db_query(
+      "INSERT INTO {blocks} (module, delta, theme, status, weight, region, custom, throttle, visibility, pages, title, cache)
+       VALUES ('%s', '%s', '%s', 1, %d, '%s', 0, 0, 0, '', '', -1)",
+      $b[0], $b[1], $theme, $b[3], $b[2]
+    );
+  }
+  if (function_exists('cache_clear_all')) {
+    cache_clear_all();
+  }
+}

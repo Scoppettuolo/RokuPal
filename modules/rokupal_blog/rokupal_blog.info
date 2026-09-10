@@ -1,0 +1,8 @@
+name = RokuPal Blog
+description = WordPress-like blog with posts, sidebar blocks and /blog listing.
+package = RokuPal
+core = 6.x
+version = "1.0.0"
+dependencies[] = node
+dependencies[] = taxonomy
+dependencies[] = filter

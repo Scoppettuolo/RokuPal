@@ -1,0 +1,361 @@
+<?php
+/**
+ * @file
+ * RokuPal Forum — phpBB/vB-style index + blocks (no extra modules).
+ */
+
+function rokupal_forum_enable() {
+  module_load_include('install', 'rokupal_forum');
+  if (function_exists('rokupal_forum_ensure')) {
+    rokupal_forum_ensure();
+  }
+  if (function_exists('rokupal_forum_setup_blocks')) {
+    rokupal_forum_setup_blocks();
+  }
+  variable_set('comment_forum_topic', 2);
+  variable_set('node_options_forum_topic', array('status'));
+  if (function_exists('menu_rebuild')) {
+    menu_rebuild();
+  }
+  cache_clear_all();
+}
+
+function rokupal_forum_disable() {
+  if (function_exists('menu_rebuild')) {
+    menu_rebuild();
+  }
+  cache_clear_all();
+}
+
+function rokupal_forum_menu() {
+  $items = array();
+  // Specific paths first (before wildcard).
+  $items['forum'] = array(
+    'title' => 'Forums',
+    'page callback' => 'rokupal_forum_page',
+    'access arguments' => array('access content'),
+    'type' => MENU_NORMAL_ITEM,
+    'weight' => -15,
+  );
+  $items['forum/active'] = array(
+    'title' => 'Active topics',
+    'page callback' => 'rokupal_forum_active_page',
+    'access arguments' => array('access content'),
+    'type' => MENU_NORMAL_ITEM,
+    'weight' => -14,
+  );
+  // Only numeric forum IDs — "active" must not match this.
+  $items['forum/%rokupal_forum_tid'] = array(
+    'title callback' => 'rokupal_forum_term_title',
+    'title arguments' => array(1),
+    'page callback' => 'rokupal_forum_term_page',
+    'page arguments' => array(1),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Menu load: only accept numeric term ids.
+ */
+function rokupal_forum_tid_load($arg) {
+  if (!is_numeric($arg) || (int) $arg <= 0) {
+    return FALSE;
+  }
+  $term = taxonomy_get_term((int) $arg);
+  return $term ? $term : FALSE;
+}
+
+function rokupal_forum_load_term($tid) {
+  $tid = (int) $tid;
+  if ($tid <= 0) {
+    return FALSE;
+  }
+  return taxonomy_get_term($tid);
+}
+
+function rokupal_forum_term_title($term) {
+  if (is_object($term) && !empty($term->name)) {
+    return $term->name;
+  }
+  if (is_numeric($term)) {
+    $t = taxonomy_get_term((int) $term);
+    return $t ? $t->name : t('Forum');
+  }
+  return t('Forum');
+}
+
+/**
+ * Forum index — categories/forums table (vBulletin/phpBB style).
+ */
+function rokupal_forum_page() {
+  $vid = variable_get('rokupal_forum_vid', 0);
+  $header = array(t('Forum'), t('Topics'), t('Posts'), t('Last post'));
+  $rows = array();
+  if ($vid) {
+    $result = db_query("SELECT tid, name, description FROM {term_data} WHERE vid = %d ORDER BY weight, name", $vid);
+    while ($term = db_fetch_object($result)) {
+      $stats = rokupal_forum_term_stats($term->tid);
+      $last = $stats['last_nid']
+        ? l(truncate_utf8($stats['last_title'], 40, TRUE, TRUE), 'node/' . $stats['last_nid']) . '<br /><span class="rp-muted">' . check_plain($stats['last_name']) . ' · ' . format_date($stats['last_time'], 'small') . '</span>'
+        : '—';
+      $rows[] = array(
+        '<strong>' . l($term->name, 'forum/' . $term->tid) . '</strong>'
+          . ($term->description ? '<div class="rp-muted">' . check_plain($term->description) . '</div>' : ''),
+        (int) $stats['topics'],
+        (int) $stats['posts'],
+        $last,
+      );
+    }
+  }
+  if (!$rows) {
+    $rows[] = array(array('data' => t('No forums yet. Enable the forum preset or add taxonomy terms.'), 'colspan' => 4));
+  }
+
+  $toolbar = '<div class="forum-toolbar">';
+  $toolbar .= l(t('Active topics'), 'forum/active');
+  if (user_access('create forum_topic content')) {
+    $toolbar .= ' · ' . l(t('New topic'), 'node/add/forum-topic');
+  }
+  $toolbar .= '</div>';
+
+  $board = rokupal_forum_board_stats();
+  $stats_bar = '<div class="forum-stats-bar">'
+    . t('Topics: @t · Posts: @p · Members: @m', array(
+      '@t' => $board['topics'],
+      '@p' => $board['posts'],
+      '@m' => $board['members'],
+    )) . '</div>';
+
+  $output = '<div class="forum-vbulletin">';
+  $output .= '<div class="forum-vbulletin-header">' . t('Forums') . '</div>';
+  $output .= $toolbar . $stats_bar;
+  $output .= theme('table', $header, $rows, array('class' => 'forum-table'));
+  $output .= '</div>';
+  return $output;
+}
+
+function rokupal_forum_term_page($tid) {
+  $term = is_object($tid) ? $tid : taxonomy_get_term((int) $tid);
+  if (!$term) {
+    return drupal_not_found();
+  }
+  $header = array(t('Topic'), t('Author'), t('Replies'), t('Last post'));
+  $sql = "SELECT n.nid, n.title, n.uid, u.name AS author,
+      COALESCE(cs.comment_count, 0) AS comment_count,
+      COALESCE(cs.last_comment_timestamp, n.created) AS last_time
+    FROM {term_node} tn
+    INNER JOIN {node} n ON n.nid = tn.nid
+    INNER JOIN {users} u ON u.uid = n.uid
+    LEFT JOIN {node_comment_statistics} cs ON cs.nid = n.nid
+    WHERE tn.tid = %d AND n.type = 'forum_topic' AND n.status = 1
+    ORDER BY last_time DESC";
+  $result = pager_query(db_rewrite_sql($sql, 'n', 'nid'), 25, 0, NULL, $term->tid);
+  $rows = array();
+  while ($row = db_fetch_object($result)) {
+    $rows[] = array(
+      l($row->title, 'node/' . $row->nid),
+      theme('username', (object) array('uid' => $row->uid, 'name' => $row->author)),
+      (int) $row->comment_count,
+      format_date($row->last_time, 'small'),
+    );
+  }
+  if (!$rows) {
+    $rows[] = array(array('data' => t('No topics in this forum yet.'), 'colspan' => 4));
+  }
+  $toolbar = '<div class="forum-toolbar">' . l(t('« All forums'), 'forum');
+  if (user_access('create forum_topic content')) {
+    $toolbar .= ' · ' . l(t('Post new topic'), 'node/add/forum-topic');
+  }
+  $toolbar .= '</div>';
+  $output = '<div class="forum-vbulletin">';
+  $output .= '<div class="forum-vbulletin-header">' . check_plain($term->name) . '</div>';
+  $output .= $toolbar;
+  $output .= theme('table', $header, $rows, array('class' => 'forum-table'));
+  $output .= theme('pager');
+  $output .= '</div>';
+  return $output;
+}
+
+function rokupal_forum_active_page() {
+  drupal_set_title(t('Active topics'));
+  $header = array(t('Topic'), t('Forum'), t('Replies'), t('Last post'));
+  // Avoid subselects — db_rewrite_sql breaks them on SQLite.
+  $sql = "SELECT n.nid, n.title, COALESCE(cs.comment_count, 0) AS comment_count,
+      COALESCE(cs.last_comment_timestamp, n.created) AS last_time
+    FROM {node} n
+    LEFT JOIN {node_comment_statistics} cs ON cs.nid = n.nid
+    WHERE n.type = 'forum_topic' AND n.status = 1
+    ORDER BY last_time DESC";
+  $result = pager_query(db_rewrite_sql($sql, 'n', 'nid'), 30);
+  $rows = array();
+  while ($row = db_fetch_object($result)) {
+    $fname = '—';
+    $tid = (int) db_result(db_query_range("SELECT tid FROM {term_node} WHERE nid = %d", 0, 1, $row->nid));
+    if ($tid) {
+      $term = taxonomy_get_term($tid);
+      if ($term) {
+        $fname = l($term->name, 'forum/' . $term->tid);
+      }
+    }
+    $rows[] = array(
+      l($row->title, 'node/' . $row->nid),
+      $fname,
+      (int) $row->comment_count,
+      format_date($row->last_time, 'small'),
+    );
+  }
+  if (!$rows) {
+    $rows[] = array(array('data' => t('No topics yet.'), 'colspan' => 4));
+  }
+  return '<div class="forum-vbulletin">'
+    . '<div class="forum-vbulletin-header">' . t('Active topics') . '</div>'
+    . '<div class="forum-toolbar">' . l(t('« All forums'), 'forum') . '</div>'
+    . theme('table', $header, $rows, array('class' => 'forum-table'))
+    . theme('pager') . '</div>';
+}
+
+function rokupal_forum_term_stats($tid) {
+  $stats = array('topics' => 0, 'posts' => 0, 'last_nid' => 0, 'last_title' => '', 'last_time' => 0, 'last_name' => '');
+  $tid = (int) $tid;
+  $stats['topics'] = (int) db_result(db_query(
+    "SELECT COUNT(DISTINCT n.nid) FROM {term_node} tn INNER JOIN {node} n ON n.nid = tn.nid WHERE tn.tid = %d AND n.type = 'forum_topic' AND n.status = 1",
+    $tid
+  ));
+  $stats['posts'] = $stats['topics'] + (int) db_result(db_query(
+    "SELECT COALESCE(SUM(cs.comment_count), 0) FROM {term_node} tn
+     INNER JOIN {node} n ON n.nid = tn.nid
+     LEFT JOIN {node_comment_statistics} cs ON cs.nid = n.nid
+     WHERE tn.tid = %d AND n.type = 'forum_topic' AND n.status = 1",
+    $tid
+  ));
+  $last = db_fetch_object(db_query(
+    "SELECT n.nid, n.title, u.name, COALESCE(cs.last_comment_timestamp, n.created) AS last_time
+     FROM {term_node} tn INNER JOIN {node} n ON n.nid = tn.nid
+     INNER JOIN {users} u ON u.uid = n.uid
+     LEFT JOIN {node_comment_statistics} cs ON cs.nid = n.nid
+     WHERE tn.tid = %d AND n.type = 'forum_topic' AND n.status = 1
+     ORDER BY last_time DESC LIMIT 1",
+    $tid
+  ));
+  if ($last) {
+    $stats['last_nid'] = $last->nid;
+    $stats['last_title'] = $last->title;
+    $stats['last_time'] = $last->last_time;
+    $stats['last_name'] = $last->name;
+  }
+  return $stats;
+}
+
+function rokupal_forum_board_stats() {
+  $topics = (int) db_result(db_query("SELECT COUNT(*) FROM {node} WHERE type = 'forum_topic' AND status = 1"));
+  $replies = (int) db_result(db_query("SELECT COALESCE(SUM(cs.comment_count), 0) FROM {node} n LEFT JOIN {node_comment_statistics} cs ON cs.nid = n.nid WHERE n.type = 'forum_topic' AND n.status = 1"));
+  $members = (int) db_result(db_query("SELECT COUNT(*) FROM {users} WHERE uid > 0 AND status = 1"));
+  return array('topics' => $topics, 'posts' => $topics + $replies, 'members' => $members);
+}
+
+function rokupal_forum_block($op = 'list', $delta = 0) {
+  switch ($op) {
+    case 'list':
+      return array(
+        'recent' => array('info' => t('Forum: recent topics')),
+        'active' => array('info' => t('Forum: active topics')),
+        'stats' => array('info' => t('Forum: board statistics')),
+        'forums' => array('info' => t('Forum: forum list')),
+        'new_topic' => array('info' => t('Forum: post new topic')),
+      );
+    case 'view':
+      switch ($delta) {
+        case 'recent':
+          return array('subject' => t('Recent topics'), 'content' => rokupal_forum_block_topics('created'));
+        case 'active':
+          return array('subject' => t('Active topics'), 'content' => rokupal_forum_block_topics('active'));
+        case 'stats':
+          return array('subject' => t('Board stats'), 'content' => rokupal_forum_block_stats());
+        case 'forums':
+          return array('subject' => t('Forums'), 'content' => rokupal_forum_block_forums());
+        case 'new_topic':
+          return array('subject' => t('Participate'), 'content' => rokupal_forum_block_new());
+      }
+  }
+}
+
+function rokupal_forum_block_topics($mode = 'created') {
+  if ($mode === 'active') {
+    $sql = "SELECT n.nid, n.title, COALESCE(cs.last_comment_timestamp, n.created) AS ts
+      FROM {node} n LEFT JOIN {node_comment_statistics} cs ON cs.nid = n.nid
+      WHERE n.type = 'forum_topic' AND n.status = 1 ORDER BY ts DESC";
+  }
+  else {
+    $sql = "SELECT n.nid, n.title, n.created AS ts FROM {node} n WHERE n.type = 'forum_topic' AND n.status = 1 ORDER BY n.created DESC";
+  }
+  $result = db_query_range($sql, 0, 8);
+  $items = array();
+  while ($row = db_fetch_object($result)) {
+    $items[] = l($row->title, 'node/' . $row->nid) . ' <span class="rp-muted">' . format_date($row->ts, 'small') . '</span>';
+  }
+  return $items ? theme('item_list', $items) : t('No topics yet.');
+}
+
+function rokupal_forum_block_stats() {
+  $s = rokupal_forum_board_stats();
+  return '<ul class="rp-forum-stats">'
+    . '<li>' . t('Topics: @n', array('@n' => $s['topics'])) . '</li>'
+    . '<li>' . t('Posts: @n', array('@n' => $s['posts'])) . '</li>'
+    . '<li>' . t('Members: @n', array('@n' => $s['members'])) . '</li>'
+    . '</ul><p>' . l(t('View forums'), 'forum') . ' · ' . l(t('Active'), 'forum/active') . '</p>';
+}
+
+function rokupal_forum_block_forums() {
+  $vid = variable_get('rokupal_forum_vid', 0);
+  if (!$vid) {
+    return t('No forums configured.');
+  }
+  $items = array();
+  $result = db_query("SELECT tid, name FROM {term_data} WHERE vid = %d ORDER BY weight, name", $vid);
+  while ($row = db_fetch_object($result)) {
+    $items[] = l($row->name, 'forum/' . $row->tid);
+  }
+  return $items ? theme('item_list', $items) : t('No forums.');
+}
+
+function rokupal_forum_block_new() {
+  $links = array(l(t('Forum index'), 'forum'));
+  if (user_access('create forum_topic content')) {
+    $links[] = l(t('Post new topic'), 'node/add/forum-topic');
+  }
+  $links[] = l(t('Active topics'), 'forum/active');
+  return theme('item_list', $links);
+}
+
+/**
+ * Place useful forum blocks in sidebar on enable.
+ */
+function rokupal_forum_setup_blocks() {
+  $theme = variable_get('theme_default', 'rokupal');
+  $region = 'left';
+  // Prefer sidebar_first if region exists in theme
+  $blocks = array(
+    array('rokupal_forum', 'stats', 0),
+    array('rokupal_forum', 'active', 1),
+    array('rokupal_forum', 'forums', 2),
+  );
+  foreach ($blocks as $b) {
+    list($module, $delta, $weight) = $b;
+    $exists = db_result(db_query("SELECT module FROM {blocks} WHERE module = '%s' AND delta = '%s' AND theme = '%s'", $module, $delta, $theme));
+    if ($exists) {
+      db_query("UPDATE {blocks} SET status = 1, region = '%s', weight = %d WHERE module = '%s' AND delta = '%s' AND theme = '%s'", $region, $weight, $module, $delta, $theme);
+    }
+    else {
+      db_query("INSERT INTO {blocks} (module, delta, theme, status, weight, region, custom, throttle, visibility, pages, title) VALUES ('%s', '%s', '%s', 1, %d, '%s', 0, 0, 0, '', '')",
+        $module, $delta, $theme, $weight, $region);
+    }
+  }
+}
+
+function rokupal_forum_help($path, $arg) {
+  if ($path == 'admin/help#rokupal_forum') {
+    return t('Forum preset inspired by classic boards (phpBB/vB): index, forums, active topics and sidebar blocks. Disable the module to turn the preset off.');
+  }
+}

@@ -1,0 +1,176 @@
+<?php
+/**
+ * @file
+ * Lightweight, validated event-to-action dispatcher for RokuPal.
+ *
+ * The legacy Trigger UI and database schema remain compatible, while event
+ * dispatching is centralized and assignment lookups are cached per request.
+ */
+
+function trigger_help($path, $arg) {
+  $explanation = '<p>' . t('Triggers connect system events with actions such as sending e-mail or changing content.') . '</p>';
+  switch ($path) {
+    case 'admin/build/trigger/comment':
+      return $explanation . '<p>' . t('Assign actions for comment events.') . '</p>';
+    case 'admin/build/trigger/node':
+      return $explanation . '<p>' . t('Assign actions for content events.') . '</p>';
+    case 'admin/build/trigger/cron':
+      return $explanation . '<p>' . t('Assign actions for cron events.') . '</p>';
+    case 'admin/build/trigger/taxonomy':
+      return $explanation . '<p>' . t('Assign actions for taxonomy events.') . '</p>';
+    case 'admin/build/trigger/user':
+      return $explanation . '<p>' . t('Assign actions for user events.') . '</p>';
+    case 'admin/help#trigger':
+      return '<p>' . t('Trigger connects actions to events from content, users, comments, taxonomy and cron.') . '</p>';
+  }
+}
+
+function trigger_menu() {
+  $items = array();
+  $contexts = array(
+    'node' => array('Content', 'node'),
+    'user' => array('Users', 'user'),
+    'comment' => array('Comments', 'comment'),
+    'taxonomy' => array('Taxonomy', 'taxonomy'),
+  );
+  $items['admin/build/trigger'] = array(
+    'title' => 'Triggers', 'description' => 'Tell RokuPal when to execute actions.',
+    'page callback' => 'trigger_assign', 'access callback' => 'trigger_access_check',
+    'access arguments' => array('node'), 'file' => 'trigger.admin.inc',
+  );
+  foreach ($contexts as $key => $context) {
+    $items['admin/build/trigger/' . $key] = array(
+      'title' => $context[0], 'page callback' => 'trigger_assign',
+      'page arguments' => array($context[1]), 'access callback' => 'trigger_access_check',
+      'access arguments' => array($context[1]), 'type' => MENU_LOCAL_TASK,
+      'file' => 'trigger.admin.inc',
+    );
+  }
+  $items['admin/build/trigger/cron'] = array(
+    'title' => 'Cron', 'page callback' => 'trigger_assign',
+    'page arguments' => array('cron'), 'access arguments' => array('administer actions'),
+    'type' => MENU_LOCAL_TASK, 'file' => 'trigger.admin.inc',
+  );
+  foreach (module_invoke_all('hook_info') as $module => $hook_info) {
+    if (in_array($module, array('node', 'comment', 'user', 'system', 'taxonomy'), TRUE) || !module_exists($module)) continue;
+    $raw = db_result(db_query("SELECT info FROM {system} WHERE name = '%s'", $module));
+    $info = @unserialize($raw);
+    if (!is_array($info) || empty($info['name'])) continue;
+    $items['admin/build/trigger/' . $module] = array(
+      'title' => $info['name'], 'page callback' => 'trigger_assign',
+      'page arguments' => array($module), 'access callback' => 'trigger_access_check',
+      'access arguments' => array($module), 'type' => MENU_LOCAL_TASK,
+      'file' => 'trigger.admin.inc',
+    );
+  }
+  $items['admin/build/trigger/unassign'] = array(
+    'title' => 'Unassign', 'page callback' => 'drupal_get_form',
+    'page arguments' => array('trigger_unassign'), 'access arguments' => array('administer actions'),
+    'type' => MENU_CALLBACK, 'file' => 'trigger.admin.inc',
+  );
+  return $items;
+}
+
+function trigger_access_check($module) {
+  return is_string($module) && module_exists($module) && user_access('administer actions');
+}
+
+function _trigger_get_hook_aids($hook, $op = '') {
+  static $cache = array();
+  $key = (string) $hook . ':' . (string) $op;
+  if (array_key_exists($key, $cache)) return $cache[$key];
+  $aids = array();
+  $result = db_query("SELECT aa.aid, a.type FROM {trigger_assignments} aa LEFT JOIN {actions} a ON aa.aid = a.aid WHERE aa.hook = '%s' AND aa.op = '%s' AND a.aid IS NOT NULL ORDER BY aa.weight", $hook, $op);
+  while ($action = db_fetch_object($result)) {
+    if (isset($action->aid) && isset($action->type)) $aids[$action->aid] = array('type' => $action->type);
+  }
+  return $cache[$key] = $aids;
+}
+
+function trigger_theme() {
+  return array('trigger_display' => array('arguments' => array('element'), 'file' => 'trigger.admin.inc'));
+}
+
+function trigger_forms() {
+  $forms = array();
+  foreach (module_invoke_all('hook_info') as $module => $hooks) {
+    if (!is_array($hooks)) continue;
+    foreach ($hooks as $hook => $ops) {
+      if (!is_array($ops)) continue;
+      foreach ($ops as $op => $description) {
+        $forms['trigger_' . $hook . '_' . $op . '_assign_form'] = array('callback' => 'trigger_assign_form');
+      }
+    }
+  }
+  return $forms;
+}
+
+function _trigger_normalize_context($type, $object, $source) {
+  if ($type === 'user' && $source === 'node' && isset($object->uid)) return user_load(array('uid' => $object->uid));
+  if ($type === 'node' && $source === 'comment') return node_load(is_array($object) ? $object['nid'] : $object->nid);
+  if ($type === 'user' && $source === 'comment') return user_load(array('uid' => is_array($object) ? $object['uid'] : $object->uid));
+  if ($type === 'node' && $source === 'user' && arg(0) === 'node' && is_numeric(arg(1)) && arg(2) === NULL) return node_load(array('nid' => arg(1)));
+  return NULL;
+}
+
+function _trigger_dispatch($hook, $op, $object, $context = array(), $extra = array()) {
+  static $running = array();
+  static $objects = array();
+  $key = (string) $hook . ':' . (string) $op;
+  if (isset($running[$key])) return;
+  $aids = _trigger_get_hook_aids($hook, $op);
+  if (!$aids) return;
+  $running[$key] = TRUE;
+  $context['hook'] = $hook;
+  $context['op'] = $op;
+  foreach ($aids as $aid => $action_info) {
+    $type = isset($action_info['type']) ? $action_info['type'] : '';
+    $target = $object;
+    $source_type = $hook === 'nodeapi' ? 'node' : $hook;
+    if ($type !== $source_type) {
+      $object_key = $hook . ':' . $type;
+      if (!array_key_exists($object_key, $objects)) $objects[$object_key] = _trigger_normalize_context($type, $object, $source_type);
+      $target = $objects[$object_key];
+    }
+    if ($hook === 'user' && $type === 'user') actions_do($aid, $target, $context, isset($extra[0]) ? $extra[0] : NULL);
+    else actions_do($aid, $target, $context, isset($extra[0]) ? $extra[0] : NULL, isset($extra[1]) ? $extra[1] : NULL);
+  }
+  unset($running[$key]);
+}
+
+function trigger_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+  if (!in_array($op, array('view', 'update', 'presave', 'insert', 'delete'), TRUE)) return;
+  _trigger_dispatch('nodeapi', $op, $node, array('node' => $node), array($a3, $a4));
+}
+
+function trigger_comment($comment, $op) {
+  if (!in_array($op, array('insert', 'update', 'delete', 'view'), TRUE)) return;
+  $comment_object = (object) $comment;
+  _trigger_dispatch('comment', $op, $comment_object, array('comment' => $comment_object));
+}
+
+function trigger_user($op, &$edit, &$account, $category = NULL) {
+  if (!in_array($op, array('login', 'logout', 'insert', 'update', 'delete', 'view'), TRUE)) return;
+  _trigger_dispatch('user', $op, $account, array('account' => $account, 'form_values' => &$edit), array($category));
+}
+
+function trigger_taxonomy($op, $type, $array) {
+  if ($type === 'term') _trigger_dispatch('taxonomy', $op, (object) $array, array('term' => (object) $array));
+}
+
+function trigger_cron() {
+  _trigger_dispatch('cron', 'run', NULL, array());
+}
+
+function trigger_options($type = 'all') {
+  $options = array(t('Choose an action'));
+  foreach (actions_actions_map(actions_get_all_actions()) as $aid => $action) {
+    if (!isset($action['type'], $action['description'])) continue;
+    $options[$action['type']][$aid] = $action['description'];
+  }
+  return $type === 'all' ? $options : (isset($options[$type]) ? $options[$type] : array());
+}
+
+function trigger_actions_delete($aid) {
+  db_query("DELETE FROM {trigger_assignments} WHERE aid = '%s'", $aid);
+}

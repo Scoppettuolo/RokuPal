@@ -1,0 +1,31 @@
+<?php
+/**
+ * RokuPal theme engine bridge. Single theme: themes/rokupal.
+ */
+$__rp = dirname(dirname(dirname(__FILE__))) . DIRECTORY_SEPARATOR . 'rokupal' . DIRECTORY_SEPARATOR . 'engine.php';
+if (is_file($__rp)) {
+  include_once $__rp;
+}
+
+if (!function_exists('phptemplate_init')) {
+  function phptemplate_init($template) {
+    $dir = dirname($template->filename);
+    $file = $dir . DIRECTORY_SEPARATOR . 'template.php';
+    if (is_file($file)) {
+      include_once $file;
+    }
+  }
+}
+
+if (!function_exists('phptemplate_theme')) {
+  function phptemplate_theme($existing, $type, $theme, $path) {
+    $templates = array();
+    if (function_exists('drupal_find_theme_functions')) {
+      $templates = drupal_find_theme_functions($existing, array('phptemplate', $theme));
+    }
+    if (function_exists('drupal_find_theme_templates')) {
+      $templates += drupal_find_theme_templates($existing, '.tpl.php', $path);
+    }
+    return $templates;
+  }
+}

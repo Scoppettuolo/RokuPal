@@ -1,0 +1,24 @@
+<?php
+/**
+ * @file
+ * Install for RokuPal Core.
+ */
+
+function rokupal_core_install() {
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_core', 0);
+  }
+  variable_set('rokupal_version', '1.0.0');
+}
+
+function rokupal_core_uninstall() {
+  variable_del('rokupal_version');
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_core', defined('SCHEMA_UNINSTALLED') ? SCHEMA_UNINSTALLED : -1);
+  }
+}
+
+function rokupal_core_update_1000() {
+  variable_set('rokupal_version', '1.0.0');
+  return array();
+}

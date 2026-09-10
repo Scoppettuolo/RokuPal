@@ -1,0 +1,42 @@
+<?php
+/**
+ * Optional Filtered HTML input format.
+ */
+function rokupal_format_filtered_enable() {
+  rokupal_format_filtered_ensure();
+}
+function rokupal_format_filtered_ensure() {
+  $roles = ',' . DRUPAL_ANONYMOUS_RID . ',' . DRUPAL_AUTHENTICATED_RID . ',';
+  $fmt = db_result(db_query("SELECT format FROM {filter_formats} WHERE name = 'Filtered HTML'"));
+  if (!$fmt) {
+    db_query("INSERT INTO {filter_formats} (name, roles, cache) VALUES ('%s', '%s', %d)", 'Filtered HTML', $roles, 1);
+    $fmt = db_last_insert_id('filter_formats', 'format');
+    db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, 'filter', 2, 0)", $fmt);
+    db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, 'filter', 0, 1)", $fmt);
+    db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, 'filter', 1, 2)", $fmt);
+    db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, 'filter', 3, 10)", $fmt);
+    variable_set('filter_html_' . $fmt, 1);
+  }
+  else {
+    db_query("UPDATE {filter_formats} SET roles = '%s' WHERE format = %d", $roles, $fmt);
+  }
+  variable_set('rokupal_format_filtered_id', $fmt);
+  return $fmt;
+}
+function rokupal_format_filtered_disable() {
+  $fmt = variable_get('rokupal_format_filtered_id', 0);
+  if (!$fmt) {
+    $fmt = db_result(db_query("SELECT format FROM {filter_formats} WHERE name = 'Filtered HTML'"));
+  }
+  if ($fmt && $fmt != variable_get('filter_default_format', 0)) {
+    db_query("UPDATE {filter_formats} SET roles = ',' WHERE format = %d", $fmt);
+  }
+}
+function rokupal_format_filtered_uninstall() {
+  $fmt = db_result(db_query("SELECT format FROM {filter_formats} WHERE name = 'Filtered HTML'"));
+  if ($fmt && $fmt != variable_get('filter_default_format', 0)) {
+    db_query("DELETE FROM {filters} WHERE format = %d", $fmt);
+    db_query("DELETE FROM {filter_formats} WHERE format = %d", $fmt);
+  }
+  variable_del('rokupal_format_filtered_id');
+}

@@ -1,0 +1,30 @@
+/* Forum list — clean table style */
+.forum-vbulletin, .rp-forum {
+  margin: 1rem 0 2rem;
+  border: 1px solid #9eb1c5;
+  background: #fff;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: var(--rp-shadow, 0 1px 3px rgba(0,0,0,.08));
+}
+.forum-vbulletin-header, .rp-forum-header {
+  background: linear-gradient(180deg, #5c7a99 0%, #3b5675 100%);
+  color: #fff;
+  padding: .7rem 1rem;
+  font-weight: 700;
+}
+.forum-toolbar { padding: .5rem 1rem; background: #eef2f7; border-bottom: 1px solid #d0d7e0; font-size: .9rem; }
+.forum-button {
+  display: inline-block; padding: .25rem .7rem;
+  background: #3b5675; color: #fff !important;
+  border-radius: 3px; font-weight: 600; text-decoration: none !important;
+}
+.forum-button:hover { background: #2a3f56; }
+.forum-table { width: 100%; border-collapse: collapse; margin: 0; }
+.forum-table th {
+  background: #e9eef5; color: #2a3f56;
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+  padding: .45rem .75rem; border-bottom: 1px solid #c8c8c8; text-align: left;
+}
+.forum-table td { padding: .55rem .75rem; border-bottom: 1px solid #e8ecf0; vertical-align: top; }
+.forum-table tr:hover td { background: #f7f9fc; }

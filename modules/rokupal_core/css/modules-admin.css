@@ -1,0 +1,42 @@
+.rp-mod-wrap { max-width: 960px; margin: 0 auto 2rem; font-family: system-ui, -apple-system, sans-serif; }
+.rp-mod-intro { color: #555; margin-bottom: 1rem; }
+.rp-mod-legend { margin-bottom: 1.25rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.rp-mod-pkg {
+  font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: #666; margin: 1.5rem 0 0.65rem; border-bottom: 1px solid #e2e6eb; padding-bottom: 0.35rem;
+}
+.rp-mod-list { display: flex; flex-direction: column; gap: 0.55rem; }
+.rp-mod-card {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1rem;
+  background: #fff; border: 1px solid #dce1e8; border-radius: 10px;
+  padding: 0.85rem 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+.rp-mod-card.is-on { border-left: 4px solid #2f9e44; }
+.rp-mod-card.is-off { border-left: 4px solid #adb5bd; opacity: 0.95; }
+.rp-mod-card.is-req { border-left-color: #1c7ed6; }
+.rp-mod-title { font-weight: 700; font-size: 1.05rem; color: #1a1d23; }
+.rp-mod-machine { font-weight: 500; font-size: 0.75rem; color: #888; background: #f1f3f5; padding: 0.1rem 0.35rem; border-radius: 4px; }
+.rp-mod-ver { font-size: 0.75rem; color: #999; margin-left: 0.25rem; }
+.rp-mod-desc { margin: 0.25rem 0 0.35rem; color: #5c6570; font-size: 0.9rem; line-height: 1.4; }
+.rp-mod-meta { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.rp-badge {
+  display: inline-block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; padding: 0.15rem 0.45rem; border-radius: 999px;
+}
+.rp-on { background: #d3f9d8; color: #2b8a3e; }
+.rp-off { background: #e9ecef; color: #495057; }
+.rp-req { background: #d0ebff; color: #1864ab; }
+.rp-schema { font-size: 0.75rem; color: #aaa; }
+.rp-mod-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.rp-mod-form { display: inline; margin: 0; }
+.rp-btn {
+  border: 0; border-radius: 6px; padding: 0.4rem 0.75rem; font-weight: 600; font-size: 0.85rem;
+  cursor: pointer; font-family: inherit;
+}
+.rp-btn-primary { background: #2f9e44; color: #fff; }
+.rp-btn-primary:hover { background: #2b8a3e; }
+.rp-btn-mute { background: #e9ecef; color: #343a40; }
+.rp-btn-mute:hover { background: #dee2e6; }
+.rp-btn-danger { background: #fff5f5; color: #c92a2a; border: 1px solid #ffc9c9; }
+.rp-btn-danger:hover { background: #ffe3e3; }
+.rp-mod-locked { font-size: 0.8rem; color: #868e96; }

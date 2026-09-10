@@ -1,0 +1,43 @@
+<?php
+/**
+ * @file RokuPal Poll — standalone.
+ */
+
+function rokupal_poll_enable() {
+  module_load_include('install', 'rokupal_poll');
+  if (function_exists('rokupal_poll_install')) {
+    // ensure type only
+    if (!node_get_types('type', 'poll_choice')) {
+      rokupal_poll_install();
+    }
+  }
+  if (function_exists('menu_rebuild')) {
+    menu_rebuild();
+  }
+}
+
+function rokupal_poll_menu() {
+  $items = array();
+  $items['polls'] = array(
+    'title' => 'Polls',
+    'page callback' => 'rokupal_poll_list',
+    'access arguments' => array('access content'),
+    'type' => MENU_NORMAL_ITEM,
+    'menu_name' => 'primary-links',
+    'weight' => -17,
+  );
+  return $items;
+}
+
+function rokupal_poll_list() {
+  $sql = "SELECT n.nid, n.title, n.created FROM {node} n WHERE n.type = 'poll_choice' AND n.status = 1 ORDER BY n.created DESC";
+  $result = pager_query(db_rewrite_sql($sql, 'n', 'nid'), 20);
+  $items = array();
+  while ($row = db_fetch_object($result)) {
+    $items[] = l($row->title, 'node/' . $row->nid) . ' <span class="rp-meta">' . format_date($row->created, 'small') . '</span>';
+  }
+  if (!$items) {
+    return t('No polls yet.');
+  }
+  return theme('item_list', $items) . theme('pager');
+}

@@ -1,0 +1,8 @@
+name = RokuPal Forum
+description = Discussion forum with categories and topics.
+package = RokuPal
+core = 6.x
+version = "1.0.0"
+dependencies[] = node
+dependencies[] = taxonomy
+dependencies[] = comment

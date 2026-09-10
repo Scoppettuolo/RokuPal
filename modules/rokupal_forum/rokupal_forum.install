@@ -1,0 +1,140 @@
+<?php
+/**
+ * @file
+ * Install only marker schema. Content type/vocab on first /forum view.
+ */
+
+function rokupal_forum_schema() {
+  return array(
+    'rokupal_forum_meta' => array(
+      'description' => 'RokuPal forum install marker.',
+      'fields' => array(
+        'mid' => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+        'name' => array('type' => 'varchar', 'length' => 64, 'not null' => TRUE, 'default' => ''),
+      ),
+      'primary key' => array('mid'),
+    ),
+  );
+}
+
+function rokupal_forum_install() {
+  // Only schema — never taxonomy/node_type here (breaks late enable).
+  if (function_exists('drupal_install_schema')) {
+    drupal_install_schema('rokupal_forum');
+  }
+  if (function_exists('db_table_exists') && db_table_exists('rokupal_forum_meta')) {
+    $exists = db_result(db_query("SELECT mid FROM {rokupal_forum_meta} LIMIT 1"));
+    if (!$exists) {
+      db_query("INSERT INTO {rokupal_forum_meta} (name) VALUES ('installed')");
+    }
+  }
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_forum', 0);
+  }
+  variable_set('rokupal_forum_version', 1);
+}
+
+function rokupal_forum_uninstall() {
+  if (function_exists('drupal_uninstall_schema')) {
+    drupal_uninstall_schema('rokupal_forum');
+  }
+  variable_del('rokupal_forum_version');
+  variable_del('rokupal_forum_vid');
+  variable_del('rokupal_forum_structure_ready');
+  variable_del('rokupal_forum_just_enabled');
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_forum', defined('SCHEMA_UNINSTALLED') ? SCHEMA_UNINSTALLED : -1);
+  }
+}
+
+function rokupal_forum_ensure_structure() {
+  if (variable_get('rokupal_forum_structure_ready', 0)) {
+    $vid = (int) variable_get('rokupal_forum_vid', 0);
+    if ($vid && function_exists('taxonomy_vocabulary_load') && taxonomy_vocabulary_load($vid)) {
+      return;
+    }
+  }
+
+  if (function_exists('node_get_types') && !node_get_types('type', 'forum_topic')) {
+    $obj = (object) array(
+      'type' => 'forum_topic',
+      'name' => 'Forum topic',
+      'module' => 'node',
+      'description' => 'Tema de discusión en un foro.',
+      'has_title' => 1,
+      'title_label' => 'Subject',
+      'has_body' => 1,
+      'body_label' => 'Body',
+      'min_word_count' => 0,
+      'custom' => 1,
+      'modified' => 1,
+      'locked' => 0,
+      'help' => '',
+    );
+    if (function_exists('node_type_save')) {
+      node_type_save($obj);
+    }
+    variable_set('node_options_forum_topic', array('status'));
+    variable_set('comment_forum_topic', 2);
+    if (function_exists('node_types_rebuild')) {
+      node_types_rebuild();
+    }
+  }
+
+  $vid = (int) variable_get('rokupal_forum_vid', 0);
+  $vocab = ($vid && function_exists('taxonomy_vocabulary_load')) ? taxonomy_vocabulary_load($vid) : FALSE;
+  if (!$vocab) {
+    $found = (int) db_result(db_query("SELECT vid FROM {vocabulary} WHERE name = 'Forums' LIMIT 1"));
+    if ($found) {
+      $vid = $found;
+      variable_set('rokupal_forum_vid', $vid);
+      $vocab = taxonomy_vocabulary_load($vid);
+    }
+  }
+  if (!$vocab && function_exists('taxonomy_save_vocabulary')) {
+    $edit = array(
+      'name' => 'Forums',
+      'description' => 'Categorías de foro.',
+      'help' => '',
+      'tags' => 0,
+      'multiple' => 0,
+      'required' => 1,
+      'hierarchy' => 1,
+      'relations' => 0,
+      'module' => 'taxonomy',
+      'weight' => 0,
+      'nodes' => array('forum_topic' => 1),
+    );
+    taxonomy_save_vocabulary($edit);
+    if (!empty($edit['vid'])) {
+      $vid = (int) $edit['vid'];
+      variable_set('rokupal_forum_vid', $vid);
+    }
+  }
+  elseif ($vocab) {
+    $vid = (int) $vocab->vid;
+    variable_set('rokupal_forum_vid', $vid);
+    db_query("DELETE FROM {vocabulary_node_types} WHERE vid = %d AND type = 'forum_topic'", $vid);
+    db_query("INSERT INTO {vocabulary_node_types} (vid, type) VALUES (%d, 'forum_topic')", $vid);
+  }
+
+  if (!empty($vid) && function_exists('taxonomy_get_tree')) {
+    $tree = taxonomy_get_tree($vid);
+    if (empty($tree) && function_exists('taxonomy_save_term')) {
+      foreach (array(
+        array('General discussion', 'Talk about anything.'),
+        array('News & announcements', 'Official news.'),
+        array('Help & support', 'Questions and troubleshooting.'),
+      ) as $weight => $pair) {
+        $term = array(
+          'vid' => $vid,
+          'name' => $pair[0],
+          'description' => $pair[1],
+          'weight' => $weight,
+        );
+        taxonomy_save_term($term);
+      }
+    }
+  }
+  variable_set('rokupal_forum_structure_ready', 1);
+}

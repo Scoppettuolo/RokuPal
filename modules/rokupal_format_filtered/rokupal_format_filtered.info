@@ -1,0 +1,6 @@
+name = Filtered HTML format
+description = Optional Filtered HTML input format (enable only if you need it).
+package = RokuPal
+core = 6.x
+version = "1.0.0"
+dependencies[] = filter

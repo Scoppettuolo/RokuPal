@@ -1,0 +1,4 @@
+name = RokuPal
+description = Default RokuPal 1.0 installation profile (blog-ready).
+version = "1.0.0"
+core = 6.x

@@ -1,0 +1,32 @@
+/* RokuPal base — modern reset + tokens */
+:root {
+  --rp-bg: #eef1f5;
+  --rp-surface: #ffffff;
+  --rp-text: #1a1d23;
+  --rp-muted: #5c6570;
+  --rp-brand: #1a1a2e;
+  --rp-accent: #3b5675;
+  --rp-accent-hover: #2a3f56;
+  --rp-link: #0b5cab;
+  --rp-border: #d5dbe3;
+  --rp-ok: #d4edda;
+  --rp-err: #f8d7da;
+  --rp-warn: #fff3cd;
+  --rp-radius: 6px;
+  --rp-shadow: 0 1px 4px rgba(0,0,0,.08);
+  --rp-font: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  --rp-max: 1120px;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  margin: 0;
+  font-family: var(--rp-font);
+  line-height: 1.55;
+  color: var(--rp-text);
+  background: var(--rp-bg);
+}
+a { color: var(--rp-link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+img { max-width: 100%; height: auto; }
+h1,h2,h3 { line-height: 1.25; }

@@ -1,0 +1,11 @@
+RokuPal 1.0.0
+=============
+
+Fork de CMS orientado a blog y foro. No usa la marca "Drupal 6".
+
+Instalación: install.php
+Módulos: admin/build/modules (interfaz nueva)
+Colores: admin/settings/color
+Markdown: activar módulo y usar formato "Markdown" al escribir.
+
+Versión: 1.0.0

@@ -1,0 +1,201 @@
+<?php
+/**
+ * @file
+ * RokuPal Markdown filter — attaches to formats and converts on process.
+ */
+
+function rokupal_markdown_enable() {
+  rokupal_markdown_ensure_format(TRUE);
+  rokupal_markdown_open_formats();
+  cache_clear_all();
+  drupal_set_message(t('Markdown enabled. Input format “Markdown” is available. Default format updated.'));
+}
+
+function rokupal_markdown_disable() {
+  cache_clear_all('filter_list', 'cache');
+  cache_clear_all('filter_formats', 'cache');
+}
+
+/**
+ * Create/update Markdown format and wire the filter.
+ */
+function rokupal_markdown_ensure_format($set_default = FALSE) {
+  if (!db_table_exists('filter_formats') || !db_table_exists('filters')) {
+    return 0;
+  }
+
+  $format = (int) db_result(db_query("SELECT format FROM {filter_formats} WHERE name = 'Markdown' LIMIT 1"));
+  if (!$format) {
+    $format = (int) db_result(db_query("SELECT MAX(format) FROM {filter_formats}")) + 1;
+    if ($format < 1) {
+      $format = 2;
+    }
+    // roles: empty string in D6 means all roles in some versions; use anon+auth
+    $roles = ',' . DRUPAL_ANONYMOUS_RID . ',' . DRUPAL_AUTHENTICATED_RID . ',';
+    db_query(
+      "INSERT INTO {filter_formats} (format, name, roles, cache) VALUES (%d, '%s', '%s', %d)",
+      $format, 'Markdown', $roles, 1
+    );
+  }
+
+  // Only our filter on Markdown format (clean pipeline)
+  db_query("DELETE FROM {filters} WHERE format = %d", $format);
+  db_query(
+    "INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, 'rokupal_markdown', 0, 0)",
+    $format
+  );
+
+  variable_set('rokupal_markdown_format', $format);
+  rokupal_markdown_open_formats();
+
+  if ($set_default || !variable_get('filter_default_format', 0)) {
+    variable_set('filter_default_format', $format);
+  }
+
+  // Clear filter static caches
+  if (function_exists('filter_formats')) {
+    // force rebuild next request
+  }
+  cache_clear_all('filter_formats', 'cache');
+  cache_clear_all();
+
+  return $format;
+}
+
+function rokupal_markdown_filter($op, $delta = 0, $format = -1, $text = '') {
+  switch ($op) {
+    case 'list':
+      return array(0 => t('RokuPal Markdown'));
+    case 'description':
+      return t('Markdown → HTML (# headings, **bold**, lists, links, code).');
+    case 'prepare':
+      return $text;
+    case 'process':
+      return rokupal_markdown_convert($text);
+    case 'settings':
+      return array();
+    case 'no cache':
+      return FALSE;
+  }
+  return $text;
+}
+
+/**
+ * Convert Markdown to HTML.
+ */
+function rokupal_markdown_convert($text) {
+  if ($text === '' || $text === NULL) {
+    return '';
+  }
+  $text = str_replace(array("\r\n", "\r"), "\n", (string) $text);
+
+  $blocks = array();
+  $text = preg_replace_callback('/```[^\n]*\n(.*?)\n```/s', function ($m) use (&$blocks) {
+    $k = '%%MDCODE' . count($blocks) . '%%';
+    $blocks[$k] = '<pre><code>' . htmlspecialchars($m[1], ENT_QUOTES, 'UTF-8') . '</code></pre>';
+    return $k;
+  }, $text);
+
+  $lines = explode("\n", $text);
+  $out = array();
+  $in_ul = $in_ol = FALSE;
+  $para = array();
+
+  $flush = function () use (&$para, &$out) {
+    if ($para) {
+      $out[] = '<p>' . implode(' ', $para) . '</p>';
+      $para = array();
+    }
+  };
+  $close = function () use (&$in_ul, &$in_ol, &$out) {
+    if ($in_ul) { $out[] = '</ul>'; $in_ul = FALSE; }
+    if ($in_ol) { $out[] = '</ol>'; $in_ol = FALSE; }
+  };
+
+  foreach ($lines as $line) {
+    if (preg_match('/^%%MDCODE\d+%%$/', trim($line))) {
+      $close(); $flush();
+      $out[] = trim($line);
+      continue;
+    }
+    if (preg_match('/^(#{1,6})\s+(.+)$/', $line, $m)) {
+      $close(); $flush();
+      $n = strlen($m[1]);
+      $out[] = '<h' . $n . '>' . rokupal_markdown_inline($m[2]) . '</h' . $n . '>';
+      continue;
+    }
+    if (preg_match('/^>\s?(.*)$/', $line, $m)) {
+      $close(); $flush();
+      $out[] = '<blockquote><p>' . rokupal_markdown_inline($m[1]) . '</p></blockquote>';
+      continue;
+    }
+    if (preg_match('/^[\-\*\+]\s+(.+)$/', $line, $m)) {
+      $flush();
+      if ($in_ol) { $out[] = '</ol>'; $in_ol = FALSE; }
+      if (!$in_ul) { $out[] = '<ul>'; $in_ul = TRUE; }
+      $out[] = '<li>' . rokupal_markdown_inline($m[1]) . '</li>';
+      continue;
+    }
+    if (preg_match('/^\d+\.\s+(.+)$/', $line, $m)) {
+      $flush();
+      if ($in_ul) { $out[] = '</ul>'; $in_ul = FALSE; }
+      if (!$in_ol) { $out[] = '<ol>'; $in_ol = TRUE; }
+      $out[] = '<li>' . rokupal_markdown_inline($m[1]) . '</li>';
+      continue;
+    }
+    if (trim($line) === '') {
+      $close(); $flush();
+      continue;
+    }
+    $close();
+    $para[] = rokupal_markdown_inline($line);
+  }
+  $close(); $flush();
+
+  $html = implode("\n", $out);
+  foreach ($blocks as $k => $v) {
+    $html = str_replace($k, $v, $html);
+  }
+  return $html;
+}
+
+function rokupal_markdown_inline($text) {
+  $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+  $text = preg_replace('/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/', '<a href="$2">$1</a>', $text);
+  $text = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $text);
+  $text = preg_replace('/__(.+?)__/s', '<strong>$1</strong>', $text);
+  $text = preg_replace('/\*(.+?)\*/s', '<em>$1</em>', $text);
+  $text = preg_replace('/_(.+?)_/s', '<em>$1</em>', $text);
+  $text = preg_replace('/`([^`]+)`/', '<code>$1</code>', $text);
+  $text = preg_replace('/~~(.+?)~~/s', '<del>$1</del>', $text);
+  return $text;
+}
+
+/**
+ * Default new nodes to Markdown format when module is on.
+ */
+function rokupal_markdown_form_alter(&$form, $form_state, $form_id) {
+  // Do not override filter radios structure — only ensure formats exist.
+  if (strpos($form_id, '_node_form') !== FALSE || $form_id == 'comment_form') {
+    rokupal_markdown_ensure_format(FALSE);
+  }
+}
+
+function rokupal_markdown_help($path, $arg) {
+  if ($path == 'admin/help#rokupal_markdown') {
+    return t('Use input format Markdown. Syntax: # heading, **bold**, *italic*, - list, [text](http://url).');
+  }
+}
+
+
+/**
+ * Make sure Markdown + Full HTML are selectable (roles column).
+ */
+function rokupal_markdown_open_formats() {
+  if (!db_table_exists('filter_formats')) {
+    return;
+  }
+  $roles = ',' . DRUPAL_ANONYMOUS_RID . ',' . DRUPAL_AUTHENTICATED_RID . ',';
+  // Open common formats so radios appear and stick
+  db_query("UPDATE {filter_formats} SET roles = '%s' WHERE name IN ('Markdown', 'Full HTML', 'Filtered HTML', 'Plain text')", $roles);
+}
