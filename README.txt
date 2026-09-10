@@ -6,9 +6,9 @@ RokuPal https://github.com/Scoppettuolo/RokuPal Es la primera versión más o me
 
 En si es un Fork moderno de Drupal 6., Pero muy modificado.
 
-Roku es 6 en japonés
+Roku es 6 en japonés.
 Rokku (ロック) es la adaptación fonética en Katakana de la palabra en inglés rock.
-Pal es Amigo en Ingles, y además es la parte final de Drupal
+Pal es Amigo en Ingles, y además es la parte final de Drupal.
 
 Por lo cual...:
 
@@ -20,8 +20,7 @@ RokuPal 1.0.0
 
 ---
 
-RokuPal es una bifurcación CMS autónoma (linaje API Drupal 6) centrada en
-blogs, foros y sitios sencillos. No es la marca "Drupal 6": el producto.
+RokuPal es una bifurcación CMS autónoma (linaje API Drupal 6) centrada en blogs, foros y sitios sencillos. No es "Drupal 6" como tal.
 El nombre es RokuPal.
 
 ---
@@ -75,6 +74,10 @@ Lo que es el programa en si mismo es AGPLv3., Excepto la Mascota.
 
 ---
 
+Svasti An Scoppettuolo ( KatNya - YukiTsuki )
+
+---
+
 ---
 
 ---
@@ -85,12 +88,12 @@ RokuPal - The Friendly Rock
 
 ---
 
-RokuPal https://github.com/Scoppettuolo/RokuPal is the first reasonably stable version of RokuPal - The Friendly Rock.
+RokuPal https://github.com/Scoppettuolo/RokuPal is the first more-or-less stable version of RokuPal - The Friendly Rock.
 
 It is essentially a modern fork of Drupal 6, but heavily modified.
 
 "Roku" is Japanese for 6.
-"Rokku" (ロック) is the Katakana phonetic adaptation of the English word "rock."
+"Rokku" (ロック) is the Katakana phonetic adaptation of the English word "rock".
 "Pal" means friend in English and is also the suffix of "Drupal."
 
 Hence...:
@@ -103,8 +106,7 @@ RokuPal 1.0.0
 
 ---
 
-RokuPal is a standalone CMS fork (descended from the Drupal 6 API) focused on
-blogs, forums, and simple websites. It is not the "Drupal 6" brand/product.
+RokuPal is a standalone CMS fork (Drupal 6 API lineage) focused on blogs, forums, and simple sites. It is not "Drupal 6" per se.
 The name is RokuPal.
 
 ---
@@ -116,7 +118,7 @@ Installation
 1. Copy this folder to your web root (e.g., htdocs/rokupal).
 2. Open install.php in your browser.
 3. Choose SQLite or MySQL and create the administrator account.
-4. The default blog configuration is enabled by default.
+4. The blog configuration is enabled by default.
 
 ---
 
@@ -149,12 +151,14 @@ RokuPal 1.0.0
 
 ---
 
-"Additional terms under Section 7 of the AGPLv3: The source code of this program is licensed under the AGPLv3. However, copyright regarding the program's name, logo, and graphic mascot belongs exclusively to the original creator. Use of the mascot and the original name in any modified version or fork of this software is prohibited without prior written consent."
-
-In other words, the mascot.
-RokuPal is the name of the mascot — the friendly rock.
-The character — just that.
+"Additional terms under Section 7 of the AGPLv3: The source code of this program is licensed under the AGPLv3. However, copyright regarding the program's name, logo, and graphic mascot belongs exclusively to the original creator. Use of the mascot and the original name in any modified version or fork of this software is prohibited without prior written consent." In other words, the mascot.
+RokuPal is the name of the mascot—the friendly rock.
+The character—just that.
 The program itself is licensed under AGPLv3, except for the mascot.
+
+---
+
+Svasti An Scoppettuolo ( KatNya - YukiTsuki )
 
 ---
 
