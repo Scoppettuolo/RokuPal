@@ -8,7 +8,7 @@ function system_requirements($phase) {
   // Ensure translations don't break at install time
   $t = get_t();
 
-  // Report Drupal version
+  // Report RokuPal version
   if ($phase == 'runtime') {
     $requirements['drupal'] = array(
       'title' => $t('RokuPal'),
@@ -81,7 +81,7 @@ function system_requirements($phase) {
         $description .= ' '. $t('Contact your system administrator or hosting provider for assistance with increasing your PHP memory limit.');
       }
 
-      $requirements['php_memory_limit']['description'] = $description .' '. $t('See the <a href="@url">Drupal requirements</a> for more information.', array('@url' => 'http://drupal.org/requirements'));
+      $requirements['php_memory_limit']['description'] = $description .' '. $t('See the <a href="@url">PHP requirements</a> for more information.', array('@url' => 'https://www.php.net/manual/en/install.php'));
       $requirements['php_memory_limit']['severity'] = REQUIREMENT_WARNING;
     }
   }
@@ -313,7 +313,7 @@ function system_requirements($phase) {
         'title' => $t('HTTP request status'),
         'value' => $t('Fails'),
         'severity' => REQUIREMENT_ERROR,
-        'description' => $t('Your system or network configuration does not allow Drupal to access web pages, resulting in reduced functionality. This could be due to your webserver configuration or PHP settings, and should be resolved in order to download information about available updates, fetch aggregator feeds, sign in via OpenID, or use other network-dependent services.'),
+        'description' => $t('Your system or network configuration does not allow RokuPal to access web pages, resulting in reduced functionality. This could be due to your webserver configuration or PHP settings, and should be resolved in order to fetch external feeds, sign in via OpenID, or use other network-dependent services.'),
       );
     }
   }
@@ -481,7 +481,7 @@ function system_schema() {
   // some database drivers, e.g. Oracle and DB2, will require variable_get()
   // and variable_set() for overcoming some database specific limitations.
   $schema['variable'] = array(
-    'description' => 'Named variable/value pairs created by Drupal core or any other module or theme. All variables are cached in memory at the start of every Drupal request so developers should not be careless about what is stored here.',
+    'description' => 'Named variable/value pairs created by RokuPal core or any other module or theme. All variables are cached in memory at the start of every Drupal request so developers should not be careless about what is stored here.',
     'fields' => array(
       'name' => array(
         'description' => 'The name of the variable.',
@@ -640,7 +640,7 @@ function system_schema() {
         'not null' => TRUE,
         'default' => ''),
       'filepath' => array(
-        'description' => 'Path of the file relative to Drupal root.',
+        'description' => 'Path of the file relative to RokuPal root.',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
@@ -736,7 +736,7 @@ function system_schema() {
     'description' => 'Maps paths to various callbacks (access, page and title)',
     'fields' => array(
       'path' => array(
-        'description' => 'Primary Key: the Drupal path this entry describes',
+        'description' => 'Primary Key: the site path this entry describes',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
@@ -870,7 +870,7 @@ function system_schema() {
         'not null' => TRUE,
         'default' => 0),
       'link_path' => array(
-        'description' => 'The Drupal path or external path this link points to.',
+        'description' => 'The site path or external path this link points to.',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,

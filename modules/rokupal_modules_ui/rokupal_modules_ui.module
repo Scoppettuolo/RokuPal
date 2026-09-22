@@ -1,0 +1,35 @@
+<?php
+/**
+ * @file RokuPal Modules UI — extracted from rokupal_core.
+ */
+
+/**
+ * Implements hook_help().
+ */
+function rokupal_modules_ui_help($section) {
+  if ($section == 'admin/build/modules' || strpos($section, 'admin/build/modules') === 0) {
+    return '<p>' . t('Manage which modules are enabled, disabled, or uninstalled.') . '</p>';
+  }
+}
+
+
+function rokupal_modules_ui_menu_alter(&$items) {
+  $path = drupal_get_path('module', 'rokupal_modules_ui');
+  $file = 'rokupal_modules_ui.modules.inc';
+  foreach (array('admin/build/modules', 'admin/build/modules/list') as $key) {
+    if (isset($items[$key])) {
+      $items[$key]['page callback'] = 'rokupal_modules_ui_page';
+      $items[$key]['page arguments'] = array();
+      $items[$key]['file'] = $file;
+      $items[$key]['file path'] = $path;
+      $items[$key]['module'] = 'rokupal_modules_ui';
+    }
+  }
+  if (isset($items['admin/build/modules/uninstall'])) {
+    $items['admin/build/modules/uninstall']['page callback'] = 'rokupal_modules_ui_page';
+    $items['admin/build/modules/uninstall']['page arguments'] = array('uninstall');
+    $items['admin/build/modules/uninstall']['file'] = $file;
+    $items['admin/build/modules/uninstall']['file path'] = $path;
+    $items['admin/build/modules/uninstall']['module'] = 'rokupal_modules_ui';
+  }
+}

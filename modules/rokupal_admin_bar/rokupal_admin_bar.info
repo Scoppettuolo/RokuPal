@@ -1,0 +1,6 @@
+name = RokuPal Admin Bar
+description = Lightweight sticky admin bar for users with administration access.
+package = RokuPal
+core = 6.x
+version = "1.6.2"
+dependencies[] = rokupal_core

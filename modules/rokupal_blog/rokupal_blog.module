@@ -6,6 +6,7 @@
 
 function rokupal_blog_enable() {
   module_load_include('install', 'rokupal_blog');
+  if (function_exists('rokupal_blog_ensure_menu')) { rokupal_blog_ensure_menu(); }
   if (function_exists('rokupal_blog_ensure_type')) {
     rokupal_blog_ensure_type();
     rokupal_blog_ensure_vocab();
@@ -15,6 +16,7 @@ function rokupal_blog_enable() {
   // Soft defaults (no new modules)
   variable_set('comment_blog_post', 2);
   variable_set('node_options_blog_post', array('status', 'promote'));
+  variable_del('rokupal_menu_sig');
   if (function_exists('menu_rebuild')) {
     menu_rebuild();
   }
@@ -80,17 +82,25 @@ function rokupal_blog_page() {
     WHERE n.type = 'blog_post' AND n.status = 1
     ORDER BY n.created DESC";
   $result = pager_query(db_rewrite_sql($sql, 'n', 'nid'), 10);
+  $ym = isset($_GET['ym']) ? preg_replace('/[^0-9\-]/', '', (string) $_GET['ym']) : '';
   $count = 0;
   while ($row = db_fetch_object($result)) {
+    if ($ym !== '' && format_date($row->created, 'custom', 'Y-m') !== $ym) {
+      continue;
+    }
     $count++;
     $output .= rokupal_blog_render_item($row);
   }
+  if ($ym !== '') {
+    $output .= '<p class="rp-blog-filter">' . t('Showing posts from @ym.', array('@ym' => $ym)) .
+      ' ' . l(t('Clear filter'), 'blog') . '</p>';
+  }
   if (!$count) {
-    $output .= '<p>' . t('No posts yet.') . ' ';
+    $output .= '<div class="rp-empty"><p>' . t('No posts yet.') . '</p>';
     if (user_access('create blog_post content')) {
-      $output .= l(t('Write the first post'), 'node/add/blog-post');
+      $output .= '<p>' . l(t('Write the first post'), 'node/add/blog-post') . '</p>';
     }
-    $output .= '</p>';
+    $output .= '</div>';
   }
   $output .= theme('pager');
   $output .= '</div>';
@@ -114,7 +124,7 @@ function rokupal_blog_render_item($row) {
     '@date' => format_date($row->created, 'medium'),
   )) . '</div>';
   if ($teaser !== '') {
-    $out .= '<div class="rp-blog-excerpt">' . check_plain(strip_tags($teaser)) . '</div>';
+    $out .= '<div class="rp-blog-excerpt">' . (function_exists('filter_xss') ? filter_xss($teaser) : check_plain(strip_tags($teaser))) . '</div>';
   }
   $out .= '<p class="rp-blog-more">' . l(t('Read more'), 'node/' . $row->nid) . '</p>';
   $out .= '</article>';
@@ -126,43 +136,28 @@ function rokupal_blog_render_item($row) {
  */
 function rokupal_blog_archive_page() {
   $out = '<div class="rp-blog-archive"><h2>' . t('Archives') . '</h2>';
-  $result = db_query("SELECT strftime('%%Y-%%m', datetime(created, 'unixepoch')) AS ym, COUNT(*) AS c
-    FROM {node} WHERE type = 'blog_post' AND status = 1 GROUP BY ym ORDER BY ym DESC");
-  // SQLite-specific; fallback generic
-  if (!$result) {
-    $result = db_query("SELECT FROM_UNIXTIME(created, '%%Y-%%m') AS ym, COUNT(*) AS c FROM {node} WHERE type = 'blog_post' AND status = 1 GROUP BY ym ORDER BY ym DESC");
-  }
-  $items = array();
+  // Portable: group in PHP (SQLite + MySQL + MariaDB).
+  $result = db_query("SELECT created FROM {node} WHERE type = 'blog_post' AND status = 1");
+  $buckets = array();
   while ($row = db_fetch_object($result)) {
-    if (empty($row->ym)) {
-      continue;
+    $ym = format_date($row->created, 'custom', 'Y-m');
+    if (!isset($buckets[$ym])) {
+      $buckets[$ym] = 0;
     }
-    $items[] = '<li><strong>' . check_plain($row->ym) . '</strong> (' . (int) $row->c . ')</li>';
+    $buckets[$ym]++;
   }
-  // Portable archive without SQL date funcs
-  if (!$items) {
-    $result = db_query("SELECT created FROM {node} WHERE type = 'blog_post' AND status = 1");
-    $buckets = array();
-    while ($row = db_fetch_object($result)) {
-      $ym = format_date($row->created, 'custom', 'Y-m');
-      if (!isset($buckets[$ym])) {
-        $buckets[$ym] = 0;
-      }
-      $buckets[$ym]++;
-    }
-    krsort($buckets);
-    foreach ($buckets as $ym => $c) {
-      $items[] = '<li><strong>' . check_plain($ym) . '</strong> (' . (int) $c . ')</li>';
-    }
+  krsort($buckets);
+  $items = array();
+  foreach ($buckets as $ym => $c) {
+    $items[] = '<li>' . l(check_plain($ym), 'blog', array('query' => array('ym' => $ym))) .
+      ' <span class="rp-archive-count">(' . (int) $c . ')</span></li>';
   }
-  $out .= $items ? '<ul class="rp-archive-list">' . implode('', $items) . '</ul>' : '<p>' . t('No posts yet.') . '</p>';
+  $out .= $items ? '<ul class="rp-archive-list">' . implode('', $items) . '</ul>' : '<p class="rp-empty">' . t('No posts yet.') . '</p>';
   $out .= '<p>' . l(t('← Back to blog'), 'blog') . '</p></div>';
   return $out;
 }
 
-/**
- * Category listing by tid.
- */
+
 function rokupal_blog_category_page($tid) {
   $tid = (int) $tid;
   $term = taxonomy_get_term($tid);
@@ -224,10 +219,10 @@ function rokupal_blog_block($op = 'list', $delta = 0) {
   switch ($op) {
     case 'list':
       return array(
-        'recent' => array('info' => t('Blog: recent posts')),
-        'categories' => array('info' => t('Blog: categories')),
-        'archive' => array('info' => t('Blog: monthly archive')),
-        'meta' => array('info' => t('Blog: meta (RSS / write)')),
+        'recent' => array('info' => t('Blog: recent posts'), 'cache' => BLOCK_CACHE_GLOBAL),
+        'categories' => array('info' => t('Blog: categories'), 'cache' => BLOCK_CACHE_GLOBAL),
+        'archive' => array('info' => t('Blog: monthly archive'), 'cache' => BLOCK_CACHE_GLOBAL),
+        'meta' => array('info' => t('Blog: meta (RSS / write)'), 'cache' => BLOCK_CACHE_PER_ROLE),
       );
     case 'view':
       switch ($delta) {
@@ -245,9 +240,10 @@ function rokupal_blog_block($op = 'list', $delta = 0) {
 
 function rokupal_blog_block_recent() {
   $items = array();
-  $result = db_query_range("SELECT nid, title FROM {node} WHERE type = 'blog_post' AND status = 1 ORDER BY created DESC", 0, 8);
+  $result = db_query_range("SELECT nid, title, created FROM {node} WHERE type = 'blog_post' AND status = 1 ORDER BY created DESC", 0, 8);
   while ($row = db_fetch_object($result)) {
-    $items[] = l($row->title, 'node/' . $row->nid);
+    $items[] = l($row->title, 'node/' . $row->nid)
+      . ' <span class="rp-muted">' . format_date($row->created, 'small') . '</span>';
   }
   return $items ? theme('item_list', $items) : t('No posts yet.');
 }
@@ -308,5 +304,62 @@ function rokupal_blog_block_meta() {
 function rokupal_blog_help($path, $arg) {
   if ($path == 'admin/help#rokupal_blog') {
     return t('Blog preset: posts, categories, archive, RSS and sidebar blocks. Disable the module to turn the preset off.');
+  }
+}
+
+
+/**
+ * Ensure Blog appears in primary links.
+ */
+function rokupal_blog_ensure_menu() {
+  if (!function_exists('menu_link_save')) {
+    return;
+  }
+  // Avoid duplicates: look for link to blog path.
+  $exists = db_result(db_query("SELECT mlid FROM {menu_links} WHERE link_path = 'blog' AND menu_name = 'primary-links' LIMIT 1"));
+  if ($exists) {
+    return;
+  }
+  $item = array(
+    'link_title' => t('Blog'),
+    'link_path' => 'blog',
+    'menu_name' => 'primary-links',
+    'weight' => -20,
+    'expanded' => 0,
+  );
+  menu_link_save($item);
+  if (function_exists('menu_cache_clear_all')) {
+    menu_cache_clear_all();
+  }
+}
+
+
+
+/**
+ * Add RSS autodiscovery on blog pages.
+ */
+function rokupal_blog_preprocess_page(&$vars) {
+  if (arg(0) == 'blog' || (isset($vars['node']) && is_object($vars['node']) && $vars['node']->type == 'blog_post')) {
+    $path = 'blog/feed';
+    // Only if menu/path exists; blog module may register feed.
+    if (function_exists('drupal_add_link')) {
+      drupal_add_link(array(
+        'rel' => 'alternate',
+        'type' => 'application/rss+xml',
+        'title' => t('Blog RSS'),
+        'href' => url('rss.xml', array('absolute' => TRUE)),
+      ));
+    }
+  }
+}
+
+
+function rokupal_blog_form_alter(&$form, $form_state, $form_id) {
+  if ($form_id != 'blog_post_node_form') {
+    return;
+  }
+  $vid = (int) variable_get('rokupal_blog_vid', 0);
+  if ($vid && isset($form['taxonomy'][$vid])) {
+    $form['taxonomy'][$vid]['#title'] = t('Blog categories');
   }
 }

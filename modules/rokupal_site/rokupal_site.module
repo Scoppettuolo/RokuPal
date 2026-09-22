@@ -1,0 +1,201 @@
+<?php
+/**
+ * @file
+ * RokuPal site helpers (extracted from rokupal_core).
+ */
+
+/**
+ * Implements hook_init().
+ */
+function rokupal_site_init() {
+  rokupal_site_ensure_primary_links();
+  if (variable_get('user_pictures', NULL) === NULL) {
+    rokupal_site_setup_pictures();
+  }
+}
+
+/**
+ * Implements hook_enable().
+ */
+function rokupal_site_enable() {
+  rokupal_site_setup_pictures();
+  rokupal_site_setup_start_block();
+  // Migrate Getting started block from core if present.
+  if (function_exists('db_query')) {
+    @db_query("UPDATE {blocks} SET module = 'rokupal_site' WHERE module = 'rokupal_core' AND delta = 'start'");
+  }
+  variable_del('rokupal_menu_sig');
+  rokupal_site_ensure_primary_links();
+  cache_clear_all();
+}
+
+/**
+ * Implements hook_menu().
+ */
+function rokupal_site_menu() {
+  $items = array();
+  $items['admin/settings/rokupal-about'] = array(
+    'title' => 'Create About page',
+    'page callback' => 'rokupal_site_create_about_page',
+    'access arguments' => array('administer nodes'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+/**
+ * Ensure primary-links for Blog / Forums / Polls.
+ */
+function rokupal_site_ensure_primary_links() {
+  static $done = FALSE;
+  if ($done || !function_exists('menu_link_save') || !function_exists('db_query')) {
+    return;
+  }
+  $done = TRUE;
+  $sig = (module_exists('rokupal_blog') ? 'b' : '')
+    . (module_exists('rokupal_forum') ? 'f' : '')
+    . (module_exists('rokupal_poll') ? 'p' : '');
+  if ($sig === '' || variable_get('rokupal_menu_sig', '') === $sig) {
+    return;
+  }
+  $links = array();
+  if (module_exists('rokupal_blog')) {
+    $links[] = array('title' => 'Blog', 'path' => 'blog', 'weight' => -20);
+  }
+  if (module_exists('rokupal_forum')) {
+    $links[] = array('title' => 'Forums', 'path' => 'forum', 'weight' => -18);
+  }
+  if (module_exists('rokupal_poll')) {
+    $links[] = array('title' => 'Polls', 'path' => 'polls', 'weight' => -16);
+  }
+  foreach ($links as $link) {
+    $exists = db_result(db_query("SELECT mlid FROM {menu_links} WHERE link_path = '%s' AND menu_name = 'primary-links' LIMIT 1", $link['path']));
+    if ($exists) {
+      continue;
+    }
+    $item = array(
+      'link_title' => t($link['title']),
+      'link_path' => $link['path'],
+      'menu_name' => 'primary-links',
+      'weight' => $link['weight'],
+      'expanded' => 0,
+    );
+    menu_link_save($item);
+  }
+  variable_set('rokupal_menu_sig', $sig);
+}
+
+/**
+ * Enable user pictures with sensible defaults.
+ */
+function rokupal_site_setup_pictures() {
+  variable_set('user_pictures', 1);
+  variable_set('user_picture_path', 'pictures');
+  variable_set('user_picture_default', '');
+  variable_set('user_picture_dimensions', '1024x1024');
+  variable_set('user_picture_file_size', 512);
+  variable_set('user_picture_guidelines', t('Upload a square image. Max 512 KB.'));
+}
+
+/**
+ * Place Getting started block.
+ */
+function rokupal_site_setup_start_block() {
+  $theme = variable_get('theme_default', 'rokupal');
+  $exists = db_result(db_query("SELECT module FROM {blocks} WHERE module = 'rokupal_site' AND delta = 'start' AND theme = '%s'", $theme));
+  if ($exists) {
+    db_query("UPDATE {blocks} SET status = 1, region = 'right', weight = -10 WHERE module = 'rokupal_site' AND delta = 'start' AND theme = '%s'", $theme);
+  }
+  else {
+    db_query("INSERT INTO {blocks} (module, delta, theme, status, weight, region, custom, throttle, visibility, pages, title) VALUES ('rokupal_site', 'start', '%s', 1, -10, 'right', 0, 0, 0, '', '')", $theme);
+  }
+}
+
+/**
+ * Implements hook_block().
+ */
+function rokupal_site_block($op = 'list', $delta = 0, $edit = array()) {
+  if ($op == 'list') {
+    return array(
+      'start' => array(
+        'info' => t('RokuPal: Getting started'),
+        'weight' => -10,
+        'cache' => BLOCK_CACHE_PER_ROLE,
+      ),
+    );
+  }
+  if ($op == 'view' && $delta == 'start') {
+    if (!user_access('administer nodes') && !user_access('access administration pages')) {
+      return array();
+    }
+    $items = array();
+    $items[] = l(t('Write a blog post'), 'node/add/blog-post');
+    $items[] = l(t('Create About page'), 'admin/settings/rokupal-about');
+    $items[] = l(t('Add a static page'), 'node/add/page');
+    if (module_exists('rokupal_forum')) {
+      $items[] = l(t('Visit forums'), 'forum');
+    }
+    $items[] = l(t('Configure theme colors'), 'admin/settings/color');
+    $items[] = l(t('Manage modules'), 'admin/build/modules');
+    $items[] = l(t('Blocks layout'), 'admin/build/block');
+    if (module_exists('rokupal_comments')) {
+      /* comments UX on */
+    }
+    $items[] = l(t('Menus'), 'admin/build/menu');
+    return array(
+      'subject' => t('Getting started'),
+      'content' => theme('item_list', $items),
+    );
+  }
+  return array();
+}
+
+/**
+ * Create About page once + primary-links entry.
+ */
+function rokupal_site_create_about_page() {
+  $nid = (int) variable_get('rokupal_about_nid', 0);
+  if ($nid) {
+    $n = node_load($nid);
+    if ($n && !empty($n->nid)) {
+      drupal_set_message(t('About page already exists.'));
+      drupal_goto('node/' . $nid);
+    }
+  }
+  $found = db_result(db_query("SELECT n.nid FROM {node} n WHERE n.type = 'page' AND n.title = 'About' LIMIT 1"));
+  if ($found) {
+    variable_set('rokupal_about_nid', (int) $found);
+    drupal_goto('node/' . $found);
+  }
+  global $user;
+  $node = new stdClass();
+  $node->type = 'page';
+  $node->title = 'About';
+  $node->body = "<p>Welcome. Edit this page to tell visitors about your site.</p>\n\n<p>Created by RokuPal — change or delete anytime.</p>";
+  $node->teaser = $node->body;
+  $node->uid = !empty($user->uid) ? $user->uid : 1;
+  $node->status = 1;
+  $node->promote = 0;
+  $node->comment = 0;
+  $node->format = variable_get('filter_default_format', 1);
+  node_save($node);
+  if (!empty($node->nid)) {
+    variable_set('rokupal_about_nid', (int) $node->nid);
+    if (function_exists('menu_link_save')) {
+      $exists = db_result(db_query("SELECT mlid FROM {menu_links} WHERE link_path = '%s' AND menu_name = 'primary-links'", 'node/' . $node->nid));
+      if (!$exists) {
+        $item = array(
+          'link_title' => t('About'),
+          'link_path' => 'node/' . $node->nid,
+          'menu_name' => 'primary-links',
+          'weight' => 10,
+        );
+        menu_link_save($item);
+      }
+    }
+    drupal_set_message(t('About page created.'));
+    drupal_goto('node/' . $node->nid . '/edit');
+  }
+  drupal_set_message(t('Could not create About page.'), 'error');
+  drupal_goto('admin');
+}

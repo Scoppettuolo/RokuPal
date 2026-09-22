@@ -13,6 +13,31 @@ if (!is_file('./includes/bootstrap.inc')) {
 require_once './includes/bootstrap.inc';
 require_once './includes/install.rokupal.inc';
 
+function rokupal_install_preflight() {
+  $errors = array();
+  $dir = './sites/default';
+  if (!is_dir('./sites')) {
+    @mkdir('./sites', 0775, TRUE);
+  }
+  if (!is_dir($dir)) {
+    @mkdir($dir, 0775, TRUE);
+  }
+  if (!is_dir($dir)) {
+    $errors[] = 'No existe sites/default y no se pudo crear. Creala manualmente y quita el atributo Solo lectura (Windows/XAMPP).';
+  }
+  elseif (!is_writable($dir)) {
+    $errors[] = 'sites/default no tiene permiso de escritura. En XAMPP (Windows): clic derecho en la carpeta → Propiedades → desmarca Solo lectura → Aplicar.';
+  }
+  if (is_file($dir . '/settings.php') && !is_writable($dir . '/settings.php')) {
+    $errors[] = 'settings.php existe pero es de solo lectura. Desmarca Solo lectura en el archivo.';
+  }
+  if (!is_dir($dir . '/files')) {
+    @mkdir($dir . '/files', 0775, TRUE);
+  }
+  return $errors;
+}
+
+
 function rokupal_install_page_shell($inner) {
   header('Content-Type: text/html; charset=utf-8');
   echo '<!DOCTYPE html><html><head><meta charset="utf-8"/><title>RokuPal install</title>';
@@ -32,7 +57,12 @@ ul.log{font-size:.85rem;max-height:12rem;overflow:auto;background:#f7f9fc;paddin
 }
 
 if (empty($_POST['op'])) {
+  $__pf = rokupal_install_preflight();
   $inner = '<h1>RokuPal — instalación</h1>';
+  if (!empty($__pf)) {
+    $inner .= '<div class="err"><strong>Permisos</strong><ul><li>' . implode('</li><li>', array_map('htmlspecialchars', $__pf)) . '</li></ul>';
+    $inner .= '<p class="muted">Corrige esto antes de instalar. En XAMPP (Windows): clic derecho en la carpeta <code>sites</code> → Propiedades → desmarca <em>Solo lectura</em> → Aplicar a subcarpetas y archivos.</p></div>';
+  }
   $inner .= '<p class="muted">Instalador del fork (perfil <strong>RokuPal</strong> único). Blog se activa siempre.</p>';
   $inner .= '<form method="post">';
   $inner .= '<label>Base de datos</label>';
@@ -73,5 +103,5 @@ try {
   rokupal_install_page_shell($inner);
 }
 catch (Exception $e) {
-  rokupal_install_page_shell('<h1>Error</h1><div class="err">' . htmlspecialchars($e->getMessage()) . '</div><p><a href="install.php">Volver</a></p>');
+  rokupal_install_page_shell('<h1>Error</h1><div class="err">' . htmlspecialchars($e->getMessage()) . '<br><small>' . htmlspecialchars($e->getFile() . ':' . $e->getLine()) . '</small></div><p><a href="install.php">Volver</a></p>');
 }

@@ -1,0 +1,26 @@
+<?php
+/**
+ * @file RokuPal Themes UI.
+ */
+
+/**
+ * Implements hook_help().
+ */
+function rokupal_themes_ui_help($section) {
+  if ($section == 'admin/build/themes' || strpos($section, 'admin/build/themes') === 0) {
+    return '<p>' . t('Choose and enable themes.') . '</p>';
+  }
+}
+
+
+function rokupal_themes_ui_menu_alter(&$items) {
+  $path = drupal_get_path('module', 'rokupal_themes_ui');
+  $file = 'rokupal_themes_ui.themes.inc';
+  if (isset($items['admin/build/themes'])) {
+    $items['admin/build/themes']['page callback'] = 'rokupal_themes_ui_page';
+    $items['admin/build/themes']['page arguments'] = array();
+    $items['admin/build/themes']['file'] = $file;
+    $items['admin/build/themes']['file path'] = $path;
+    $items['admin/build/themes']['module'] = 'rokupal_themes_ui';
+  }
+}

@@ -1,19 +1,25 @@
 <?php
 /**
- * @file RokuPal Poll — standalone.
+ * @file
+ * RokuPal Poll — simple polls: question = title, choices = body (one per line).
  */
 
 function rokupal_poll_enable() {
   module_load_include('install', 'rokupal_poll');
-  if (function_exists('rokupal_poll_install')) {
-    // ensure type only
+  if (function_exists('rokupal_poll_ensure_type')) {
+    rokupal_poll_ensure_type();
+  }
+  elseif (function_exists('rokupal_poll_install')) {
     if (!node_get_types('type', 'poll_choice')) {
       rokupal_poll_install();
     }
   }
+  // Force menu rescan for primary-links.
+  variable_del('rokupal_menu_sig');
   if (function_exists('menu_rebuild')) {
     menu_rebuild();
   }
+  cache_clear_all();
 }
 
 function rokupal_poll_menu() {
@@ -23,8 +29,14 @@ function rokupal_poll_menu() {
     'page callback' => 'rokupal_poll_list',
     'access arguments' => array('access content'),
     'type' => MENU_NORMAL_ITEM,
-    'menu_name' => 'primary-links',
     'weight' => -17,
+  );
+  $items['poll/vote/%node'] = array(
+    'title' => 'Vote',
+    'page callback' => 'rokupal_poll_vote_submit',
+    'page arguments' => array(2),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
   );
   return $items;
 }
@@ -32,12 +44,188 @@ function rokupal_poll_menu() {
 function rokupal_poll_list() {
   $sql = "SELECT n.nid, n.title, n.created FROM {node} n WHERE n.type = 'poll_choice' AND n.status = 1 ORDER BY n.created DESC";
   $result = pager_query(db_rewrite_sql($sql, 'n', 'nid'), 20);
-  $items = array();
+  $out = '';
+  $count = 0;
   while ($row = db_fetch_object($result)) {
-    $items[] = l($row->title, 'node/' . $row->nid) . ' <span class="rp-meta">' . format_date($row->created, 'small') . '</span>';
+    $count++;
+    $out .= '<article class="rp-blog-item rp-poll-item">';
+    $out .= '<h2 class="rp-blog-title">' . l($row->title, 'node/' . $row->nid) . '</h2>';
+    $out .= '<div class="rp-blog-meta">' . format_date($row->created, 'medium') . '</div>';
+    $out .= '<p class="rp-blog-more">' . l(t('Vote / results'), 'node/' . $row->nid) . '</p>';
+    $out .= '</article>';
   }
-  if (!$items) {
-    return t('No polls yet.');
+  if (!$count) {
+    $out = '<div class="rp-empty"><p>' . t('No polls yet.') . '</p>';
+    if (user_access('create poll_choice content')) {
+      $out .= '<p>' . l(t('Create a poll'), 'node/add/poll-choice') . '</p>';
+    }
+    $out .= '</div>';
   }
-  return theme('item_list', $items) . theme('pager');
+  return $out . theme('pager');
+}
+
+/**
+ * Parse choices from node body (one per line, ignore empty).
+ */
+function rokupal_poll_choices($node) {
+  $body = '';
+  if (is_object($node) && isset($node->body)) {
+    $body = $node->body;
+  }
+  $lines = preg_split('/\r\n|\r|\n/', (string) $body);
+  $choices = array();
+  foreach ($lines as $line) {
+    $line = trim(strip_tags($line));
+    if ($line !== '') {
+      $choices[] = $line;
+    }
+  }
+  return $choices;
+}
+
+function rokupal_poll_vote_counts($nid) {
+  $counts = array();
+  if (!db_table_exists('rokupal_poll_votes')) {
+    return $counts;
+  }
+  $result = db_query("SELECT choice_idx, votes FROM {rokupal_poll_votes} WHERE nid = %d", $nid);
+  while ($row = db_fetch_object($result)) {
+    $counts[(int) $row->choice_idx] = (int) $row->votes;
+  }
+  return $counts;
+}
+
+function rokupal_poll_user_voted($nid) {
+  global $user;
+  if (!db_table_exists('rokupal_poll_ballots')) {
+    return FALSE;
+  }
+  if (!empty($user->uid)) {
+    return (bool) db_result(db_query("SELECT 1 FROM {rokupal_poll_ballots} WHERE nid = %d AND uid = %d LIMIT 1", $nid, $user->uid));
+  }
+  $sid = session_id();
+  if ($sid) {
+    return (bool) db_result(db_query("SELECT 1 FROM {rokupal_poll_ballots} WHERE nid = %d AND uid = 0 AND sid = '%s' LIMIT 1", $nid, $sid));
+  }
+  return FALSE;
+}
+
+/**
+ * Render poll on node view.
+ */
+function rokupal_poll_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+  if ($node->type !== 'poll_choice') {
+    return;
+  }
+  if ($op == 'view' && empty($teaser)) {
+    $node->content['body']['#value'] = rokupal_poll_render($node);
+    $node->content['body']['#weight'] = 0;
+  }
+  if ($op == 'view' && $teaser) {
+    $choices = rokupal_poll_choices($node);
+    $node->teaser = check_plain($node->title) . ' (' . count($choices) . ' ' . t('choices') . ')';
+  }
+}
+
+function rokupal_poll_render($node) {
+  $choices = rokupal_poll_choices($node);
+  if (!$choices) {
+    return '<p class="rp-muted">' . t('No choices defined. Edit the poll and put one choice per line in the body.') . '</p>';
+  }
+  $counts = rokupal_poll_vote_counts($node->nid);
+  $total = array_sum($counts);
+  $voted = rokupal_poll_user_voted($node->nid);
+  $show_results = $voted || !empty($_GET['results']);
+
+  $out = '<div class="rp-poll">';
+  if (!$show_results && user_access('access content')) {
+    $out .= '<form method="post" action="' . check_url(url('poll/vote/' . $node->nid)) . '" class="rp-poll-form">';
+    $out .= '<input type="hidden" name="form_token" value="' . check_plain(drupal_get_token('poll-vote-' . $node->nid)) . '" />';
+    foreach ($choices as $i => $label) {
+      $out .= '<label class="rp-poll-choice"><input type="radio" name="choice" value="' . (int) $i . '" /> '
+        . check_plain($label) . '</label>';
+    }
+    $out .= '<p><button type="submit" class="form-submit">' . t('Vote') . '</button> ';
+    $out .= l(t('View results'), 'node/' . $node->nid, array('query' => array('results' => 1))) . '</p>';
+    $out .= '</form>';
+  }
+  else {
+    $out .= '<ul class="rp-poll-results">';
+    foreach ($choices as $i => $label) {
+      $c = isset($counts[$i]) ? $counts[$i] : 0;
+      $pct = $total > 0 ? round(100 * $c / $total) : 0;
+      $out .= '<li><span class="rp-poll-label">' . check_plain($label) . '</span> ';
+      $out .= '<span class="rp-poll-bar-wrap"><span class="rp-poll-bar" style="width:' . $pct . '%"></span></span> ';
+      $out .= '<span class="rp-poll-pct">' . $pct . '% (' . $c . ')</span></li>';
+    }
+    $out .= '</ul>';
+    $out .= '<p class="rp-muted">' . t('Total votes: @n', array('@n' => $total)) . '</p>';
+    if (!$voted) {
+      $out .= '<p>' . l(t('Back to voting'), 'node/' . $node->nid) . '</p>';
+    }
+  }
+  $out .= '</div>';
+  return $out;
+}
+
+function rokupal_poll_vote_submit($node) {
+  if (!is_object($node) || $node->type !== 'poll_choice') {
+    return drupal_not_found();
+  }
+  if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    drupal_goto('node/' . $node->nid);
+  }
+  $token = isset($_POST['form_token']) ? $_POST['form_token'] : '';
+  if (!drupal_valid_token($token, 'poll-vote-' . $node->nid)) {
+    drupal_set_message(t('Invalid token.'), 'error');
+    drupal_goto('node/' . $node->nid);
+  }
+  if (rokupal_poll_user_voted($node->nid)) {
+    drupal_set_message(t('You already voted in this poll.'));
+    drupal_goto('node/' . $node->nid, 'results=1');
+  }
+  $choice = isset($_POST['choice']) ? (int) $_POST['choice'] : -1;
+  $choices = rokupal_poll_choices($node);
+  if ($choice < 0 || $choice >= count($choices)) {
+    drupal_set_message(t('Please select a choice.'), 'error');
+    drupal_goto('node/' . $node->nid);
+  }
+  if (!db_table_exists('rokupal_poll_votes')) {
+    module_load_include('install', 'rokupal_poll');
+    if (function_exists('rokupal_poll_schema_vote_tables')) {
+      rokupal_poll_schema_vote_tables();
+    }
+  }
+  global $user;
+  $uid = !empty($user->uid) ? (int) $user->uid : 0;
+  $sid = $uid ? '' : session_id();
+  // Upsert vote count
+  $exists = db_result(db_query("SELECT votes FROM {rokupal_poll_votes} WHERE nid = %d AND choice_idx = %d", $node->nid, $choice));
+  if ($exists === FALSE || $exists === NULL) {
+    db_query("INSERT INTO {rokupal_poll_votes} (nid, choice_idx, votes) VALUES (%d, %d, 1)", $node->nid, $choice);
+  }
+  else {
+    db_query("UPDATE {rokupal_poll_votes} SET votes = votes + 1 WHERE nid = %d AND choice_idx = %d", $node->nid, $choice);
+  }
+  db_query("INSERT INTO {rokupal_poll_ballots} (nid, uid, sid, choice_idx, voted) VALUES (%d, %d, '%s', %d, %d)",
+    $node->nid, $uid, $sid, $choice, time());
+  drupal_set_message(t('Your vote has been recorded.'));
+  drupal_goto('node/' . $node->nid, 'results=1');
+}
+
+function rokupal_poll_block($op = 'list', $delta = 0) {
+  if ($op == 'list') {
+    return array('recent' => array('info' => t('Polls: recent'), 'cache' => BLOCK_CACHE_GLOBAL));
+  }
+  if ($op == 'view') {
+    $items = array();
+    $result = db_query_range("SELECT nid, title FROM {node} WHERE type = 'poll_choice' AND status = 1 ORDER BY created DESC", 0, 5);
+    while ($row = db_fetch_object($result)) {
+      $items[] = l($row->title, 'node/' . $row->nid);
+    }
+    return array(
+      'subject' => t('Polls'),
+      'content' => $items ? theme('item_list', $items) : t('No polls yet.'),
+    );
+  }
 }

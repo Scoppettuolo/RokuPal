@@ -1,0 +1,48 @@
+<?php
+/**
+ * @file
+ * Lightweight admin bar (extracted from rokupal_core).
+ */
+
+/**
+ * Whether the admin bar should render.
+ */
+function rokupal_admin_bar_enabled() {
+  return user_access('access administration pages') && php_sapi_name() !== 'cli';
+}
+
+/**
+ * Build admin bar HTML.
+ */
+function rokupal_admin_bar_render() {
+  if (!rokupal_admin_bar_enabled()) {
+    return '';
+  }
+  global $user;
+  $items = array();
+  $items[] = l(t('Dashboard'), 'admin');
+  $items[] = l(t('Content'), 'admin/content/node');
+  $items[] = l(t('Create'), 'node/add');
+  if (user_access('administer site configuration') || user_access('access administration pages')) {
+    $items[] = l(t('Modules'), 'admin/build/modules');
+    $items[] = l(t('Blocks'), 'admin/build/block');
+    $items[] = l(t('Menus'), 'admin/build/menu');
+    $items[] = l(t('Themes'), 'admin/build/themes');
+  }
+  if (user_access('administer users')) {
+    $items[] = l(t('Users'), 'admin/user/user');
+  }
+  if (module_exists('rokupal_blog') && user_access('create blog_post content')) {
+    $items[] = l(t('New post'), 'node/add/blog-post');
+  }
+  $items[] = l(t('My account'), 'user/' . (int) $user->uid);
+  $items[] = l(t('Log out'), 'logout');
+
+  $out = '<div id="rokupal-admin-bar" role="navigation" aria-label="' . check_plain(t('Administration')) . '">';
+  $out .= '<div class="rp-ab-inner"><span class="rp-ab-brand">RokuPal</span><ul class="rp-ab-links">';
+  foreach ($items as $link) {
+    $out .= '<li>' . $link . '</li>';
+  }
+  $out .= '</ul></div></div>';
+  return $out;
+}

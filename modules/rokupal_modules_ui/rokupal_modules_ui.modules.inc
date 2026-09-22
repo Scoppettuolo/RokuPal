@@ -7,7 +7,7 @@
 /**
  * Required modules that cannot be disabled or uninstalled.
  */
-function rokupal_core_modules_required() {
+function rokupal_modules_ui_required() {
   $req = array('system', 'user', 'node', 'filter', 'block');
   if (function_exists('drupal_required_modules')) {
     $req = array_unique(array_merge($req, drupal_required_modules()));
@@ -21,8 +21,8 @@ function rokupal_core_modules_required() {
  * @param string $view
  *   '' or 'list' = all modules; 'uninstall' = only disabled with schema installed.
  */
-function rokupal_core_modules_page($view = '') {
-  drupal_add_css(drupal_get_path('module', 'rokupal_core') . '/css/modules-admin.css');
+function rokupal_modules_ui_page($view = '') {
+  drupal_add_css(drupal_get_path('module', 'rokupal_modules_ui') . '/css/modules-admin.css');
   drupal_set_title(t('Modules'));
 
   // Handle POST actions before render
@@ -38,19 +38,19 @@ function rokupal_core_modules_page($view = '') {
     include_once './includes/install.inc';
 
     if ($op === 'enable') {
-      rokupal_core_module_enable($name);
+      rokupal_modules_ui_enable($name);
     }
     elseif ($op === 'disable') {
-      rokupal_core_module_disable($name);
+      rokupal_modules_ui_disable($name);
     }
     elseif ($op === 'uninstall') {
-      rokupal_core_module_uninstall($name);
+      rokupal_modules_ui_uninstall($name);
     }
     drupal_goto('admin/build/modules');
   }
 
   $files = module_rebuild_cache();
-  $required = rokupal_core_modules_required();
+  $required = rokupal_modules_ui_required();
   $token = function_exists('drupal_get_token') ? drupal_get_token('rokupal_modules') : '';
 
   // Group by package
@@ -118,18 +118,18 @@ function rokupal_core_modules_page($view = '') {
       $out .= '<div class="rp-mod-actions">';
       if ($enabled) {
         if (!$is_req) {
-          $out .= rokupal_core_mod_btn($name, 'disable', t('Disable'), 'rp-btn-mute', $token);
-          $out .= rokupal_core_mod_btn($name, 'uninstall', t('Uninstall'), 'rp-btn-danger', $token, TRUE);
+          $out .= rokupal_modules_ui_btn($name, 'disable', t('Disable'), 'rp-btn-mute', $token);
+          $out .= rokupal_modules_ui_btn($name, 'uninstall', t('Uninstall'), 'rp-btn-danger', $token, TRUE);
         }
         else {
           $out .= '<span class="rp-mod-locked">' . t('Cannot disable') . '</span>';
         }
       }
       else {
-        $out .= rokupal_core_mod_btn($name, 'enable', t('Enable'), 'rp-btn-primary', $token);
+        $out .= rokupal_modules_ui_btn($name, 'enable', t('Enable'), 'rp-btn-primary', $token);
         // Uninstall only if was installed before (schema >= 0)
         if ($schema >= 0 && !$is_req) {
-          $out .= rokupal_core_mod_btn($name, 'uninstall', t('Uninstall data'), 'rp-btn-danger', $token, TRUE);
+          $out .= rokupal_modules_ui_btn($name, 'uninstall', t('Uninstall data'), 'rp-btn-danger', $token, TRUE);
         }
       }
       $out .= '</div>';
@@ -142,7 +142,7 @@ function rokupal_core_modules_page($view = '') {
   return $out;
 }
 
-function rokupal_core_mod_btn($module, $op, $label, $class, $token, $confirm = FALSE) {
+function rokupal_modules_ui_btn($module, $op, $label, $class, $token, $confirm = FALSE) {
   $html = '<form method="post" action="' . check_url(url('admin/build/modules')) . '" class="rp-mod-form"';
   if ($confirm) {
     $html .= ' onsubmit="return confirm(\'' . check_plain(t('Uninstall %m and delete its data?', array('%m' => $module))) . '\');"';
@@ -161,8 +161,8 @@ function rokupal_core_mod_btn($module, $op, $label, $class, $token, $confirm = F
 /**
  * Enable module: status=1, install if schema -1, invoke enable.
  */
-function rokupal_core_module_enable($name) {
-  $required = rokupal_core_modules_required();
+function rokupal_modules_ui_enable($name) {
+  $required = rokupal_modules_ui_required();
   $file = drupal_get_filename('module', $name);
   if (!$file) {
     // Try scan
@@ -215,8 +215,8 @@ function rokupal_core_module_enable($name) {
 /**
  * Disable module: status=0, invoke disable. Required modules blocked.
  */
-function rokupal_core_module_disable($name) {
-  if (in_array($name, rokupal_core_modules_required(), TRUE)) {
+function rokupal_modules_ui_disable($name) {
+  if (in_array($name, rokupal_modules_ui_required(), TRUE)) {
     drupal_set_message(t('%m is required and cannot be disabled.', array('%m' => $name)), 'error');
     return;
   }
@@ -241,8 +241,8 @@ function rokupal_core_module_disable($name) {
 /**
  * Uninstall: disable + hook_uninstall + schema -1 + remove data.
  */
-function rokupal_core_module_uninstall($name) {
-  if (in_array($name, rokupal_core_modules_required(), TRUE)) {
+function rokupal_modules_ui_uninstall($name) {
+  if (in_array($name, rokupal_modules_ui_required(), TRUE)) {
     drupal_set_message(t('%m is required and cannot be uninstalled.', array('%m' => $name)), 'error');
     return;
   }

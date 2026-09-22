@@ -1,5 +1,5 @@
 name = RokuPal Core
-description = Core utilities for RokuPal 1.0: modules manager, blocks, frontpage, theme defaults.
+description = Core utilities: modules/blocks/menus admin UI, frontpage heal, theme defaults. (Admin bar & site helpers are separate modules.)
 package = RokuPal
 core = 6.x
-version = "1.0.0"
+version = "1.6.2"

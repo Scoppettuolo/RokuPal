@@ -5,8 +5,12 @@
  */
 
 function rokupal_forum_enable() {
-  module_load_include('install', 'rokupal_forum');
-  if (function_exists('rokupal_forum_ensure')) {
+  if (function_exists('rokupal_forum_ensure_menu')) { rokupal_forum_ensure_menu(); }
+  variable_del('rokupal_forum_structure_ready');
+  if (function_exists('rokupal_forum_ensure_structure')) {
+    rokupal_forum_ensure_structure();
+  }
+  elseif (function_exists('rokupal_forum_ensure')) {
     rokupal_forum_ensure();
   }
   if (function_exists('rokupal_forum_setup_blocks')) {
@@ -14,6 +18,7 @@ function rokupal_forum_enable() {
   }
   variable_set('comment_forum_topic', 2);
   variable_set('node_options_forum_topic', array('status'));
+  variable_del('rokupal_menu_sig');
   if (function_exists('menu_rebuild')) {
     menu_rebuild();
   }
@@ -53,6 +58,13 @@ function rokupal_forum_menu() {
     'access arguments' => array('access content'),
     'type' => MENU_CALLBACK,
   );
+  $items['forum/manage'] = array(
+    'title' => 'Manage forums',
+    'page callback' => 'rokupal_forum_manage_page',
+    'access arguments' => array('administer taxonomy'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 5,
+  );
   return $items;
 }
 
@@ -90,6 +102,9 @@ function rokupal_forum_term_title($term) {
  * Forum index — categories/forums table (vBulletin/phpBB style).
  */
 function rokupal_forum_page() {
+  if (function_exists('rokupal_forum_ensure_structure')) {
+    rokupal_forum_ensure_structure();
+  }
   $vid = variable_get('rokupal_forum_vid', 0);
   $header = array(t('Forum'), t('Topics'), t('Posts'), t('Last post'));
   $rows = array();
@@ -110,13 +125,20 @@ function rokupal_forum_page() {
     }
   }
   if (!$rows) {
-    $rows[] = array(array('data' => t('No forums yet. Enable the forum preset or add taxonomy terms.'), 'colspan' => 4));
+    $empty = t('No forums yet.');
+    if (user_access('administer taxonomy')) {
+      $empty .= ' ' . l(t('Add a forum category'), 'admin/content/taxonomy');
+    }
+    $rows[] = array(array('data' => $empty, 'colspan' => 4));
   }
 
   $toolbar = '<div class="forum-toolbar">';
   $toolbar .= l(t('Active topics'), 'forum/active');
   if (user_access('create forum_topic content')) {
-    $toolbar .= ' · ' . l(t('New topic'), 'node/add/forum-topic');
+    $toolbar .= ' · ' . l(t('New topic'), 'node/add/forum-topic', array('attributes' => array('class' => 'forum-button')));
+  }
+  if (user_access('administer taxonomy')) {
+    $toolbar .= ' · ' . l(t('Manage forums'), 'forum/manage');
   }
   $toolbar .= '</div>';
 
@@ -150,7 +172,7 @@ function rokupal_forum_term_page($tid) {
     INNER JOIN {users} u ON u.uid = n.uid
     LEFT JOIN {node_comment_statistics} cs ON cs.nid = n.nid
     WHERE tn.tid = %d AND n.type = 'forum_topic' AND n.status = 1
-    ORDER BY last_time DESC";
+    ORDER BY n.sticky DESC, last_time DESC";
   $result = pager_query(db_rewrite_sql($sql, 'n', 'nid'), 25, 0, NULL, $term->tid);
   $rows = array();
   while ($row = db_fetch_object($result)) {
@@ -166,7 +188,7 @@ function rokupal_forum_term_page($tid) {
   }
   $toolbar = '<div class="forum-toolbar">' . l(t('« All forums'), 'forum');
   if (user_access('create forum_topic content')) {
-    $toolbar .= ' · ' . l(t('Post new topic'), 'node/add/forum-topic');
+    $toolbar .= ' · ' . l(t('Post new topic'), 'node/add/forum-topic', array('query' => 'tid=' . (int) $term->tid, 'attributes' => array('class' => 'forum-button')));
   }
   $toolbar .= '</div>';
   $output = '<div class="forum-vbulletin">';
@@ -259,14 +281,17 @@ function rokupal_forum_block($op = 'list', $delta = 0) {
   switch ($op) {
     case 'list':
       return array(
-        'recent' => array('info' => t('Forum: recent topics')),
-        'active' => array('info' => t('Forum: active topics')),
-        'stats' => array('info' => t('Forum: board statistics')),
-        'forums' => array('info' => t('Forum: forum list')),
-        'new_topic' => array('info' => t('Forum: post new topic')),
+        'recent' => array('cache' => BLOCK_CACHE_GLOBAL, 'info' => t('Forum: recent topics')),
+        'active' => array('cache' => BLOCK_CACHE_GLOBAL, 'info' => t('Forum: active topics')),
+        'stats' => array('cache' => BLOCK_CACHE_GLOBAL, 'info' => t('Forum: board statistics')),
+        'forums' => array('cache' => BLOCK_CACHE_GLOBAL, 'info' => t('Forum: forum list')),
+        'new_topic' => array('cache' => BLOCK_CACHE_PER_ROLE, 'info' => t('Forum: post new topic')),
+        'online' => array('cache' => BLOCK_CACHE_GLOBAL, 'info' => t('Forum: who is online')),
       );
     case 'view':
       switch ($delta) {
+        case 'online':
+          return array('subject' => t('Who is online'), 'content' => rokupal_forum_online_block());
         case 'recent':
           return array('subject' => t('Recent topics'), 'content' => rokupal_forum_block_topics('created'));
         case 'active':
@@ -323,7 +348,7 @@ function rokupal_forum_block_forums() {
 function rokupal_forum_block_new() {
   $links = array(l(t('Forum index'), 'forum'));
   if (user_access('create forum_topic content')) {
-    $links[] = l(t('Post new topic'), 'node/add/forum-topic');
+    $links[] = l(t('Post new topic'), 'node/add/forum-topic', array('query' => 'tid=' . (int) $term->tid, 'attributes' => array('class' => 'forum-button')));
   }
   $links[] = l(t('Active topics'), 'forum/active');
   return theme('item_list', $links);
@@ -359,3 +384,363 @@ function rokupal_forum_help($path, $arg) {
     return t('Forum preset inspired by classic boards (phpBB/vB): index, forums, active topics and sidebar blocks. Disable the module to turn the preset off.');
   }
 }
+
+
+function rokupal_forum_ensure_menu() {
+  $exists = db_result(db_query("SELECT mlid FROM {menu_links} WHERE link_path = 'forum' AND menu_name = 'primary-links' LIMIT 1"));
+  if ($exists) {
+    return;
+  }
+  $item = array(
+    'link_title' => t('Forums'),
+    'link_path' => 'forum',
+    'menu_name' => 'primary-links',
+    'weight' => -18,
+    'expanded' => 0,
+  );
+  if (function_exists('menu_link_save')) {
+    menu_link_save($item);
+  }
+  if (function_exists('menu_cache_clear_all')) {
+    menu_cache_clear_all();
+  }
+}
+
+
+
+/**
+ * Implements hook_init() — ensure vocabulary/type exist without heavy work every time.
+ */
+function rokupal_forum_init() {
+  $type_ok = FALSE;
+  if (db_table_exists('node_type')) {
+    $type_ok = (bool) db_result(db_query("SELECT 1 FROM {node_type} WHERE type = 'forum_topic' LIMIT 1"));
+  }
+  $menu_ok = TRUE;
+  if (db_table_exists('menu_router')) {
+    $menu_ok = (bool) db_result(db_query("SELECT 1 FROM {menu_router} WHERE path = 'node/add/forum-topic' LIMIT 1"));
+  }
+  if ($type_ok && $menu_ok && variable_get('rokupal_forum_structure_ready', 0)) {
+    return;
+  }
+  if (function_exists('rokupal_forum_ensure_structure')) {
+    rokupal_forum_ensure_structure();
+  }
+}
+
+
+/**
+ * Implements hook_menu_breadcrumb_alter() if available — skip on D6.
+ * Use hook_preprocess_page via theme; here set title only on forum paths.
+ */
+function rokupal_forum_preprocess_page(&$vars) {
+  if (arg(0) != 'forum') {
+    return;
+  }
+  $crumbs = array(l(t('Home'), '<front>'), l(t('Forums'), 'forum'));
+  if (arg(1) && arg(1) != 'active' && is_numeric(arg(1))) {
+    $term = taxonomy_get_term((int) arg(1));
+    if ($term) {
+      $crumbs[] = check_plain($term->name);
+    }
+  }
+  elseif (arg(1) == 'active') {
+    $crumbs[] = t('Active topics');
+  }
+  $vars['breadcrumb'] = theme('breadcrumb', $crumbs);
+}
+
+
+/**
+ * Who is online — sessions active in the last 15 minutes (lightweight).
+ */
+function rokupal_forum_online_block() {
+  $window = (int) variable_get('rokupal_online_window', 900);
+  $since = time() - $window;
+  $items = array();
+  $n_anon = 0;
+  if (db_table_exists('sessions')) {
+    $result = db_query("SELECT s.uid, u.name FROM {sessions} s LEFT JOIN {users} u ON u.uid = s.uid WHERE s.timestamp >= %d ORDER BY s.timestamp DESC LIMIT 50", $since);
+    $seen = array();
+    while ($row = db_fetch_object($result)) {
+      $uid = (int) $row->uid;
+      if ($uid <= 0) {
+        $n_anon++;
+        continue;
+      }
+      if (isset($seen[$uid])) {
+        continue;
+      }
+      $seen[$uid] = TRUE;
+      $items[] = theme('username', (object) array('uid' => $uid, 'name' => $row->name));
+    }
+  }
+  $out = '';
+  if ($items) {
+    $out .= theme('item_list', $items);
+  }
+  $out .= '<p class="rp-muted">' . t('@m members, @a guests (last @min min)', array(
+    '@m' => count($items),
+    '@a' => $n_anon,
+    '@min' => (int) ($window / 60),
+  )) . '</p>';
+  return $out;
+}
+
+
+/**
+ * Force forum category on forum topics; pass ?tid= for preselect.
+ */
+function rokupal_forum_form_alter(&$form, $form_state, $form_id) {
+  if ($form_id != 'forum_topic_node_form') {
+    return;
+  }
+  $vid = (int) variable_get('rokupal_forum_vid', 0);
+  if (!$vid) {
+    if (function_exists('rokupal_forum_ensure_structure')) {
+      rokupal_forum_ensure_structure();
+      $vid = (int) variable_get('rokupal_forum_vid', 0);
+    }
+  }
+  if ($vid && isset($form['taxonomy'][$vid])) {
+    $form['taxonomy'][$vid]['#required'] = TRUE;
+    $form['taxonomy'][$vid]['#title'] = t('Forum');
+    $form['taxonomy'][$vid]['#description'] = t('Category for this topic (not a blog category).');
+    if (!empty($_GET['tid']) && is_numeric($_GET['tid'])) {
+      $form['taxonomy'][$vid]['#default_value'] = array((int) $_GET['tid']);
+    }
+  }
+  $form['title']['#title'] = t('Subject');
+}
+
+
+/**
+ * Simple UI to add forum categories (taxonomy terms under Forums vocab).
+ */
+function rokupal_forum_manage_page() {
+  if (function_exists('rokupal_forum_ensure_structure')) {
+    rokupal_forum_ensure_structure();
+  }
+  $vid = (int) variable_get('rokupal_forum_vid', 0);
+  if (!$vid) {
+    return t('Forum vocabulary is not ready. Try re-enabling the RokuPal Forum module.');
+  }
+
+  // Handle add.
+  if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['rokupal_forum_add'])) {
+    if (function_exists('drupal_valid_token') && !drupal_valid_token($_POST['token'], 'rokupal_forum_manage')) {
+      drupal_set_message(t('Invalid token'), 'error');
+    }
+    else {
+      $name = trim($_POST['name']);
+      $desc = trim($_POST['description']);
+      $parent = isset($_POST['parent']) ? (int) $_POST['parent'] : 0;
+      if ($name !== '') {
+        $term = array(
+          'vid' => $vid,
+          'name' => $name,
+          'description' => $desc,
+          'parent' => $parent ? array($parent) : array(0),
+          'weight' => 0,
+        );
+        taxonomy_save_term($term);
+        drupal_set_message(t('Forum category @n created.', array('@n' => $name)));
+        drupal_goto('forum/manage');
+      }
+    }
+  }
+
+  $token = function_exists('drupal_get_token') ? drupal_get_token('rokupal_forum_manage') : '';
+  $tree = taxonomy_get_tree($vid);
+  $rows = array();
+  foreach ($tree as $term) {
+    $indent = str_repeat('— ', (int) $term->depth);
+    $rows[] = array(
+      $indent . check_plain($term->name),
+      check_plain($term->description),
+      l(t('View'), 'forum/' . $term->tid) . ' · ' . l(t('Edit'), 'admin/content/taxonomy/edit/term/' . $term->tid),
+    );
+  }
+  if (!$rows) {
+    $rows[] = array(array('data' => t('No categories yet.'), 'colspan' => 3));
+  }
+
+  $out = '<div class="forum-vbulletin">';
+  $out .= '<div class="forum-vbulletin-header">' . t('Manage forum categories') . '</div>';
+  $out .= theme('table', array(t('Name'), t('Description'), t('Ops')), $rows, array('class' => 'forum-table'));
+
+  $parent_opts = '<option value="0">' . t('— top level —') . '</option>';
+  foreach ($tree as $term) {
+    $parent_opts .= '<option value="' . (int) $term->tid . '">' . str_repeat('— ', (int) $term->depth) . check_plain($term->name) . '</option>';
+  }
+
+  $out .= '<h3>' . t('Add category / subcategory') . '</h3>';
+  $out .= '<form method="post" action="' . url('forum/manage') . '" class="rp-forum-manage-form">';
+  $out .= '<input type="hidden" name="token" value="' . check_plain($token) . '" />';
+  $out .= '<p><label>' . t('Name') . ' <input type="text" name="name" size="40" required="required" /></label></p>';
+  $out .= '<p><label>' . t('Description') . ' <input type="text" name="description" size="60" /></label></p>';
+  $out .= '<p><label>' . t('Parent') . ' <select name="parent">' . $parent_opts . '</select></label></p>';
+  $out .= '<p><button type="submit" name="rokupal_forum_add" value="1" class="form-submit">' . t('Add forum') . '</button></p>';
+  $out .= '</form>';
+  $out .= '<p>' . l(t('« Back to forums'), 'forum') . '</p>';
+  $out .= '</div>';
+  return $out;
+}
+
+function rokupal_forum_ensure_structure() {
+  // 1) Content type — check DB directly (node_get_types static cache can lie).
+  $type_exists = FALSE;
+  if (db_table_exists('node_type')) {
+    $type_exists = (bool) db_result(db_query("SELECT 1 FROM {node_type} WHERE type = 'forum_topic' LIMIT 1"));
+  }
+  if (!$type_exists) {
+    $obj = (object) array(
+      'type' => 'forum_topic',
+      'name' => 'Forum topic',
+      'module' => 'node',
+      'description' => 'Tema de discusión en un foro.',
+      'has_title' => 1,
+      'title_label' => 'Subject',
+      'has_body' => 1,
+      'body_label' => 'Body',
+      'min_word_count' => 0,
+      'custom' => 1,
+      'modified' => 1,
+      'locked' => 0,
+      'help' => '',
+      'orig_type' => 'forum_topic',
+    );
+    if (function_exists('node_type_save')) {
+      node_type_save($obj);
+    }
+    else {
+      db_query("INSERT INTO {node_type} (type, name, module, has_title, title_label, has_body, body_label, description, help, min_word_count, custom, modified, locked, orig_type) VALUES ('forum_topic', 'Forum topic', 'node', 1, 'Subject', 1, 'Body', 'Tema de discusión en un foro.', '', 0, 1, 1, 0, 'forum_topic')");
+    }
+    variable_set('node_options_forum_topic', array('status'));
+    variable_set('comment_forum_topic', 2);
+    if (function_exists('node_types_rebuild')) {
+      node_types_rebuild();
+    }
+    // Create content list is built from MENU, not from DB alone.
+    if (function_exists('menu_rebuild')) {
+      menu_rebuild();
+    }
+  }
+
+  // 2) Vocabulary Forums → only forum_topic
+  $vid = (int) variable_get('rokupal_forum_vid', 0);
+  $vocab = ($vid && function_exists('taxonomy_vocabulary_load')) ? taxonomy_vocabulary_load($vid) : FALSE;
+  if (!$vocab) {
+    $found = (int) db_result(db_query("SELECT vid FROM {vocabulary} WHERE name = 'Forums' LIMIT 1"));
+    if ($found) {
+      $vid = $found;
+      variable_set('rokupal_forum_vid', $vid);
+      $vocab = taxonomy_vocabulary_load($vid);
+    }
+  }
+  if (!$vocab && function_exists('taxonomy_save_vocabulary')) {
+    $edit = array(
+      'name' => 'Forums',
+      'description' => 'Categorías de foro.',
+      'help' => 'Elegí el foro donde publicar el tema.',
+      'tags' => 0,
+      'multiple' => 0,
+      'required' => 1,
+      'hierarchy' => 1,
+      'relations' => 0,
+      'module' => 'taxonomy',
+      'weight' => -5,
+      'nodes' => array('forum_topic' => 1),
+    );
+    taxonomy_save_vocabulary($edit);
+    if (!empty($edit['vid'])) {
+      $vid = (int) $edit['vid'];
+      variable_set('rokupal_forum_vid', $vid);
+    }
+  }
+  elseif ($vocab) {
+    $vid = (int) $vocab->vid;
+    variable_set('rokupal_forum_vid', $vid);
+    db_query("DELETE FROM {vocabulary_node_types} WHERE vid = %d", $vid);
+    db_query("INSERT INTO {vocabulary_node_types} (vid, type) VALUES (%d, 'forum_topic')", $vid);
+    db_query("UPDATE {vocabulary} SET required = 1, hierarchy = 1, multiple = 0, tags = 0 WHERE vid = %d", $vid);
+  }
+
+  // 3) Default terms
+  if (!empty($vid) && function_exists('taxonomy_get_tree')) {
+    $tree = taxonomy_get_tree($vid);
+    if (empty($tree) && function_exists('taxonomy_save_term')) {
+      foreach (array(
+        array('General discussion', 'Talk about anything.'),
+        array('News & announcements', 'Official news.'),
+        array('Help & support', 'Questions and troubleshooting.'),
+      ) as $weight => $pair) {
+        taxonomy_save_term(array(
+          'vid' => $vid,
+          'name' => $pair[0],
+          'description' => $pair[1],
+          'weight' => $weight,
+        ));
+      }
+    }
+  }
+
+  // 4) Permissions (authenticated rid=2, admin rid=3)
+  $grant = array(
+    2 => array('create forum_topic content', 'edit own forum_topic content', 'delete own forum_topic content'),
+    3 => array('create forum_topic content', 'edit any forum_topic content', 'delete any forum_topic content', 'edit own forum_topic content', 'delete own forum_topic content'),
+  );
+  foreach ($grant as $rid => $need) {
+    $row = db_fetch_object(db_query("SELECT perm FROM {permission} WHERE rid = %d", $rid));
+    if ($row && $row->perm !== '') {
+      $perms = array_map('trim', explode(',', $row->perm));
+      // D6 often uses ", " join
+      $perms = array_filter(array_map('trim', preg_split('/,\s*/', $row->perm)));
+      $changed = FALSE;
+      foreach ($need as $p) {
+        if (!in_array($p, $perms)) {
+          $perms[] = $p;
+          $changed = TRUE;
+        }
+      }
+      if ($changed) {
+        db_query("UPDATE {permission} SET perm = '%s' WHERE rid = %d", implode(', ', $perms), $rid);
+      }
+    }
+    else {
+      // role may lack a permission row
+      $exists = db_result(db_query("SELECT COUNT(*) FROM {permission} WHERE rid = %d", $rid));
+      if ($exists) {
+        db_query("UPDATE {permission} SET perm = '%s' WHERE rid = %d", implode(', ', $need), $rid);
+      }
+      else {
+        db_query("INSERT INTO {permission} (rid, perm) VALUES (%d, '%s')", $rid, implode(', ', $need));
+      }
+    }
+  }
+
+  // 5) Ensure menu router has node/add/forum-topic
+  if (function_exists('menu_rebuild') && !variable_get('rokupal_forum_menu_ok', 0)) {
+    menu_rebuild();
+    variable_set('rokupal_forum_menu_ok', 1);
+  }
+  // If type was just created we already rebuilt; if menu still missing path, rebuild once more.
+  if (db_table_exists('menu_router')) {
+    $path_ok = db_result(db_query("SELECT path FROM {menu_router} WHERE path = 'node/add/forum-topic' LIMIT 1"));
+    if (!$path_ok && function_exists('menu_rebuild')) {
+      menu_rebuild();
+    }
+  }
+
+  variable_set('rokupal_forum_structure_ready', 1);
+  if (function_exists('cache_clear_all')) {
+    cache_clear_all();
+  }
+}
+
+/** Alias for older enable() calls. */
+function rokupal_forum_ensure() {
+  rokupal_forum_ensure_structure();
+}
+
+

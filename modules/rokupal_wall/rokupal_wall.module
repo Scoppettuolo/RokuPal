@@ -1,0 +1,193 @@
+<?php
+/**
+ * @file
+ * Per-user wall (status feed) — separate from guestbook.
+ */
+
+function rokupal_wall_perm() {
+  return array(
+    'access walls',
+    'post on own wall',
+    'delete own wall posts',
+    'administer walls',
+  );
+}
+
+function rokupal_wall_menu() {
+  $items = array();
+  $items['user/%user/wall'] = array(
+    'title' => 'Wall',
+    'page callback' => 'rokupal_wall_page',
+    'page arguments' => array(1),
+    'access callback' => 'rokupal_wall_access',
+    'access arguments' => array(1),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 4,
+  );
+  $items['user/%user/wall/delete/%'] = array(
+    'title' => 'Delete post',
+    'page callback' => 'rokupal_wall_delete',
+    'page arguments' => array(1, 4),
+    'access callback' => 'rokupal_wall_delete_access',
+    'access arguments' => array(1, 4),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+function rokupal_wall_access($account) {
+  if (!is_object($account) || empty($account->uid)) {
+    return FALSE;
+  }
+  return user_access('access walls') || user_access('administer walls');
+}
+
+function rokupal_wall_delete_access($account, $wid) {
+  global $user;
+  if (user_access('administer walls')) {
+    return TRUE;
+  }
+  if (!user_access('delete own wall posts') || empty($user->uid)) {
+    return FALSE;
+  }
+  $wid = (int) $wid;
+  $row = db_fetch_object(db_query("SELECT uid FROM {rokupal_wall} WHERE wid = %d", $wid));
+  return $row && (int) $row->uid === (int) $user->uid;
+}
+
+function rokupal_wall_page($account) {
+  global $user;
+  if (!is_object($account) || empty($account->uid)) {
+    return drupal_not_found();
+  }
+  drupal_set_title(t("@name's wall", array('@name' => $account->name)));
+
+  $output = '';
+  $can_post = user_access('post on own wall') && !empty($user->uid) && ((int) $user->uid === (int) $account->uid || user_access('administer walls'));
+  if ($can_post) {
+    $output .= drupal_get_form('rokupal_wall_form', $account);
+  }
+
+  $per_page = (int) variable_get('rokupal_wall_per_page', 20);
+  if ($per_page < 5) {
+    $per_page = 20;
+  }
+
+  $sql = "SELECT * FROM {rokupal_wall} WHERE uid = %d ORDER BY created DESC";
+  $count_sql = "SELECT COUNT(*) FROM {rokupal_wall} WHERE uid = %d";
+  $result = pager_query($sql, $per_page, 0, $count_sql, $account->uid);
+  $items = array();
+  while ($row = db_fetch_object($result)) {
+    $body = nl2br(check_plain($row->body));
+    $meta = format_date($row->created, 'small');
+    $ops = '';
+    if (rokupal_wall_delete_access($account, $row->wid)) {
+      $ops = ' · ' . l(t('Delete'), 'user/' . (int) $account->uid . '/wall/delete/' . (int) $row->wid);
+    }
+    $items[] = '<div class="rp-wall-entry">'
+      . '<div class="rp-wall-meta">' . $meta . $ops . '</div>'
+      . '<div class="rp-wall-body">' . $body . '</div>'
+      . '</div>';
+  }
+
+  if ($items) {
+    $output .= '<div class="rp-wall-list">' . implode("\n", $items) . '</div>';
+    $output .= theme('pager');
+  }
+  else {
+    $output .= '<p class="rp-muted">' . t('No wall posts yet.') . '</p>';
+  }
+
+  return $output;
+}
+
+function rokupal_wall_form(&$form_state, $account) {
+  $form = array();
+  $form['uid'] = array('#type' => 'value', '#value' => (int) $account->uid);
+  $form['body'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Update your wall'),
+    '#required' => TRUE,
+    '#rows' => 3,
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Post'),
+  );
+  return $form;
+}
+
+function rokupal_wall_form_validate($form, &$form_state) {
+  $body = trim($form_state['values']['body']);
+  if ($body === '') {
+    form_set_error('body', t('Post cannot be empty.'));
+  }
+  if (drupal_strlen($body) > 10000) {
+    form_set_error('body', t('Post is too long.'));
+  }
+}
+
+function rokupal_wall_form_submit($form, &$form_state) {
+  global $user;
+  $uid = (int) $form_state['values']['uid'];
+  // Only owner (or admin) — enforced in page, double-check.
+  if (!user_access('administer walls') && (int) $user->uid !== $uid) {
+    form_set_error('', t('You can only post on your own wall.'));
+    return;
+  }
+  $body = trim($form_state['values']['body']);
+  db_query(
+    "INSERT INTO {rokupal_wall} (uid, body, created) VALUES (%d, '%s', %d)",
+    $uid,
+    $body,
+    time()
+  );
+  drupal_set_message(t('Posted to your wall.'));
+  $form_state['redirect'] = 'user/' . $uid . '/wall';
+}
+
+function rokupal_wall_delete($account, $wid) {
+  $wid = (int) $wid;
+  db_query("DELETE FROM {rokupal_wall} WHERE wid = %d", $wid);
+  drupal_set_message(t('Wall post deleted.'));
+  drupal_goto('user/' . (int) $account->uid . '/wall');
+}
+
+function rokupal_wall_help($section) {
+  if ($section == 'admin/help#rokupal_wall') {
+    return '<p>' . t('Personal wall feed on user profiles. Disable to hide; uninstall to delete all wall posts.') . '</p>';
+  }
+}
+
+function rokupal_wall_enable() {
+  $rid = 2;
+  $need = array('access walls', 'post on own wall', 'delete own wall posts');
+  $row = db_fetch_object(db_query("SELECT perm FROM {permission} WHERE rid = %d", $rid));
+  if ($row) {
+    $perms = array_filter(array_map('trim', preg_split('/,\s*/', $row->perm)));
+    foreach ($need as $p) {
+      if (!in_array($p, $perms)) {
+        $perms[] = $p;
+      }
+    }
+    db_query("UPDATE {permission} SET perm = '%s' WHERE rid = %d", implode(', ', $perms), $rid);
+  }
+  if (function_exists('menu_rebuild')) {
+    menu_rebuild();
+  }
+}
+
+
+/**
+ * Link from user profile view.
+ */
+function rokupal_wall_user($op, &$edit, &$account, $category = NULL) {
+  if ($op == 'view' && !empty($account->uid) && user_access('access walls')) {
+    $account->content['rokupal_wall'] = array(
+      '#type' => 'user_profile_item',
+      '#title' => t('Wall'),
+      '#value' => l(t("View @name's wall", array('@name' => $account->name)), 'user/' . (int) $account->uid . '/wall'),
+      '#weight' => 8,
+    );
+  }
+}

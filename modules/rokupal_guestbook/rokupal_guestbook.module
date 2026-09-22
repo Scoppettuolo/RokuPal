@@ -1,0 +1,272 @@
+<?php
+/**
+ * @file
+ * Per-user guestbook — separate from wall.
+ */
+
+function rokupal_guestbook_perm() {
+  return array(
+    'access guestbook',
+    'post guestbook messages',
+    'moderate own guestbook',
+    'administer guestbooks',
+  );
+}
+
+function rokupal_guestbook_menu() {
+  $items = array();
+  $items['user/%user/guestbook'] = array(
+    'title' => 'Guestbook',
+    'page callback' => 'rokupal_guestbook_page',
+    'page arguments' => array(1),
+    'access callback' => 'rokupal_guestbook_access',
+    'access arguments' => array(1),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 5,
+  );
+  $items['user/%user/guestbook/delete/%'] = array(
+    'title' => 'Delete message',
+    'page callback' => 'rokupal_guestbook_delete',
+    'page arguments' => array(1, 4),
+    'access callback' => 'rokupal_guestbook_moderate_access',
+    'access arguments' => array(1),
+    'type' => MENU_CALLBACK,
+  );
+  $items['user/%user/guestbook/approve/%'] = array(
+    'title' => 'Approve message',
+    'page callback' => 'rokupal_guestbook_approve',
+    'page arguments' => array(1, 4),
+    'access callback' => 'rokupal_guestbook_moderate_access',
+    'access arguments' => array(1),
+    'type' => MENU_CALLBACK,
+  );
+    $items['admin/settings/guestbook'] = array(
+    'title' => 'Guestbook',
+    'description' => 'Moderation and limits for guestbooks.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('rokupal_guestbook_settings_form'),
+    'access arguments' => array('administer guestbooks'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+
+function rokupal_guestbook_access($account) {
+  if (!is_object($account) || empty($account->uid)) {
+    return FALSE;
+  }
+  return user_access('access guestbook') || user_access('administer guestbooks');
+}
+
+function rokupal_guestbook_moderate_access($account) {
+  global $user;
+  if (!is_object($account)) {
+    return FALSE;
+  }
+  if (user_access('administer guestbooks')) {
+    return TRUE;
+  }
+  return user_access('moderate own guestbook') && !empty($user->uid) && (int) $user->uid === (int) $account->uid;
+}
+
+/**
+ * Guestbook page for a user.
+ */
+function rokupal_guestbook_page($account) {
+  if (!is_object($account) || empty($account->uid)) {
+    return drupal_not_found();
+  }
+  drupal_set_title(t("@name's guestbook", array('@name' => $account->name)));
+
+  $output = '';
+  // Form to post (if allowed and not viewing own-only restriction — owner can also leave notes optional).
+  if (user_access('post guestbook messages')) {
+    $output .= drupal_get_form('rokupal_guestbook_form', $account);
+  }
+  else {
+    $output .= '<p class="rp-muted">' . t('You do not have permission to leave messages.') . '</p>';
+  }
+
+  $per_page = (int) variable_get('rokupal_guestbook_per_page', 20);
+  if ($per_page < 5) {
+    $per_page = 20;
+  }
+
+  global $user;
+  $is_mod = rokupal_guestbook_moderate_access($account);
+  if ($is_mod) {
+    $sql = "SELECT g.*, u.name AS author_name FROM {rokupal_guestbook} g LEFT JOIN {users} u ON u.uid = g.author_uid WHERE g.owner_uid = %d ORDER BY g.created DESC";
+    $count_sql = "SELECT COUNT(*) FROM {rokupal_guestbook} WHERE owner_uid = %d";
+  }
+  else {
+    $sql = "SELECT g.*, u.name AS author_name FROM {rokupal_guestbook} g LEFT JOIN {users} u ON u.uid = g.author_uid WHERE g.owner_uid = %d AND g.status = 1 ORDER BY g.created DESC";
+    $count_sql = "SELECT COUNT(*) FROM {rokupal_guestbook} WHERE owner_uid = %d AND status = 1";
+  }
+
+  $result = pager_query($sql, $per_page, 0, $count_sql, $account->uid);
+  $items = array();
+  while ($row = db_fetch_object($result)) {
+    $author = theme('username', (object) array('uid' => $row->author_uid, 'name' => $row->author_name));
+    $body = check_plain($row->body);
+    $body = nl2br($body);
+    $meta = format_date($row->created, 'small');
+    $status_badge = '';
+    if ((int) $row->status === 0) {
+      $status_badge = ' <span class="rp-badge">' . t('pending') . '</span>';
+    }
+    $ops = '';
+    if ($is_mod) {
+      if ((int) $row->status === 0) {
+        $ops .= ' · ' . l(t('Approve'), 'user/' . (int) $account->uid . '/guestbook/approve/' . (int) $row->gid);
+      }
+      $ops .= ' · ' . l(t('Delete'), 'user/' . (int) $account->uid . '/guestbook/delete/' . (int) $row->gid);
+    }
+    $items[] = '<div class="rp-gb-entry">'
+      . '<div class="rp-gb-meta">' . $author . ' · ' . $meta . $status_badge . $ops . '</div>'
+      . '<div class="rp-gb-body">' . $body . '</div>'
+      . '</div>';
+  }
+
+  if ($items) {
+    $output .= '<div class="rp-gb-list">' . implode("\n", $items) . '</div>';
+    $output .= theme('pager');
+  }
+  else {
+    $output .= '<p class="rp-muted">' . t('No guestbook messages yet.') . '</p>';
+  }
+
+  return $output;
+}
+
+function rokupal_guestbook_form(&$form_state, $account) {
+  $form = array();
+  $form['owner_uid'] = array('#type' => 'value', '#value' => (int) $account->uid);
+  $form['body'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Your message'),
+    '#required' => TRUE,
+    '#rows' => 4,
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Sign guestbook'),
+  );
+  return $form;
+}
+
+function rokupal_guestbook_form_validate($form, &$form_state) {
+  $body = trim($form_state['values']['body']);
+  if ($body === '') {
+    form_set_error('body', t('Message cannot be empty.'));
+  }
+  if (drupal_strlen($body) > 10000) {
+    form_set_error('body', t('Message is too long.'));
+  }
+}
+
+function rokupal_guestbook_form_submit($form, &$form_state) {
+  global $user;
+  $owner = (int) $form_state['values']['owner_uid'];
+  $body = trim($form_state['values']['body']);
+  $moderate = (int) variable_get('rokupal_guestbook_moderate', 0);
+  $status = $moderate ? 0 : 1;
+  // Owner posts to own book always published.
+  if (!empty($user->uid) && (int) $user->uid === $owner) {
+    $status = 1;
+  }
+  db_query(
+    "INSERT INTO {rokupal_guestbook} (owner_uid, author_uid, body, status, created) VALUES (%d, %d, '%s', %d, %d)",
+    $owner,
+    (int) $user->uid,
+    $body,
+    $status,
+    time()
+  );
+  if ($status) {
+    drupal_set_message(t('Your message has been posted.'));
+  }
+  else {
+    drupal_set_message(t('Your message is awaiting approval.'));
+  }
+  $form_state['redirect'] = 'user/' . $owner . '/guestbook';
+}
+
+function rokupal_guestbook_delete($account, $gid) {
+  $gid = (int) $gid;
+  $row = db_fetch_object(db_query("SELECT * FROM {rokupal_guestbook} WHERE gid = %d AND owner_uid = %d", $gid, (int) $account->uid));
+  if (!$row) {
+    return drupal_not_found();
+  }
+  db_query("DELETE FROM {rokupal_guestbook} WHERE gid = %d", $gid);
+  drupal_set_message(t('Message deleted.'));
+  drupal_goto('user/' . (int) $account->uid . '/guestbook');
+}
+
+function rokupal_guestbook_approve($account, $gid) {
+  $gid = (int) $gid;
+  db_query("UPDATE {rokupal_guestbook} SET status = 1 WHERE gid = %d AND owner_uid = %d", $gid, (int) $account->uid);
+  drupal_set_message(t('Message approved.'));
+  drupal_goto('user/' . (int) $account->uid . '/guestbook');
+}
+
+function rokupal_guestbook_help($section) {
+  if ($section == 'admin/help#rokupal_guestbook') {
+    return '<p>' . t('Guestbook messages on user profiles. Disable the module to hide it; uninstall to delete all guestbook data.') . '</p>';
+  }
+}
+
+function rokupal_guestbook_enable() {
+  // Grant defaults to authenticated.
+  $rid = 2;
+  $need = array('access guestbook', 'post guestbook messages', 'moderate own guestbook');
+  $row = db_fetch_object(db_query("SELECT perm FROM {permission} WHERE rid = %d", $rid));
+  if ($row) {
+    $perms = array_filter(array_map('trim', preg_split('/,\s*/', $row->perm)));
+    foreach ($need as $p) {
+      if (!in_array($p, $perms)) {
+        $perms[] = $p;
+      }
+    }
+    db_query("UPDATE {permission} SET perm = '%s' WHERE rid = %d", implode(', ', $perms), $rid);
+  }
+  if (function_exists('menu_rebuild')) {
+    menu_rebuild();
+  }
+}
+
+
+function rokupal_guestbook_user($op, &$edit, &$account, $category = NULL) {
+  if ($op == 'view' && !empty($account->uid) && user_access('access guestbook')) {
+    $account->content['rokupal_guestbook'] = array(
+      '#type' => 'user_profile_item',
+      '#title' => t('Guestbook'),
+      '#value' => l(t('Sign guestbook'), 'user/' . (int) $account->uid . '/guestbook'),
+      '#weight' => 9,
+    );
+  }
+}
+
+
+function rokupal_guestbook_settings_form() {
+  $form = array();
+  $form['rokupal_guestbook_moderate'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Require approval before messages are public'),
+    '#default_value' => variable_get('rokupal_guestbook_moderate', 0),
+    '#description' => t('When enabled, new messages stay pending until the profile owner approves them.'),
+  );
+  $form['rokupal_guestbook_per_page'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Messages per page'),
+    '#default_value' => variable_get('rokupal_guestbook_per_page', 20),
+    '#size' => 4,
+  );
+  $form['submit'] = array('#type' => 'submit', '#value' => t('Save'));
+  return $form;
+}
+
+function rokupal_guestbook_settings_form_submit($form, &$form_state) {
+  variable_set('rokupal_guestbook_moderate', !empty($form_state['values']['rokupal_guestbook_moderate']) ? 1 : 0);
+  variable_set('rokupal_guestbook_per_page', max(5, (int) $form_state['values']['rokupal_guestbook_per_page']));
+  drupal_set_message(t('Guestbook settings saved.'));
+}

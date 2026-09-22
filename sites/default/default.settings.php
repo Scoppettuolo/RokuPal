@@ -99,13 +99,13 @@ $db_prefix = '';
 /**
  * Database default collation.
  *
- * All data stored in Drupal is in UTF-8. Certain databases, such as MySQL,
+ * All data stored in RokuPal is in UTF-8. Certain databases, such as MySQL,
  * support different algorithms for comparing, indexing, and sorting characters;
  * a so called "collation". The default collation of a database normally works
  * for many use-cases, but depending on the language(s) of the stored data, it
  * may be necessary to use a different collation.
  * Important:
- * - Only set or change this value BEFORE installing Drupal, unless you know
+ * - Only set or change this value BEFORE installing RokuPal, unless you know
  *   what you are doing.
  * - All database tables and columns should be in the same collation. Otherwise,
  *   string comparisons performed for table JOINs will be significantly slower.
@@ -143,7 +143,7 @@ $update_free_access = FALSE;
  *   $base_url = 'http://www.example.com/drupal';
  *   $base_url = 'https://www.example.com:8888/drupal';
  *
- * It is not allowed to have a trailing slash; Drupal will add it
+ * It is not allowed to have a trailing slash; RokuPal will add it
  * for you.
  */
 # $base_url = 'http://www.example.com';  // NO trailing slash!
@@ -168,11 +168,12 @@ ini_set('session.use_only_cookies', 1);
 ini_set('session.use_trans_sid',    0);
 ini_set('session.cookie_httponly',   1);
 ini_set('session.cookie_samesite',   'Lax');
+// ini_set('session.cookie_secure', 1); // enable when site is HTTPS-only
 ini_set('url_rewriter.tags',        '');
 
 /**
  * If you encounter a situation where users post a large amount of text, and
- * the result is stripped out upon viewing but can still be edited, Drupal's
+ * the result is stripped out upon viewing but can still be edited, RokuPal's
  * output filter may not have sufficient memory to process it. If you
  * experience this issue, you may wish to uncomment the following two lines
  * and increase the limits of these variables. For more information, see
@@ -199,7 +200,7 @@ ini_set('url_rewriter.tags',        '');
  * useful in a configuration file for a vhost or directory, rather than
  * the default settings.php. Any configuration setting from the 'variable'
  * table can be given a new value. Note that any values you provide in
- * these variable overrides will not be modifiable from the Drupal
+ * these variable overrides will not be modifiable from the RokuPal
  * administration interface.
  *
  * Remove the leading hash signs to enable.
@@ -228,9 +229,9 @@ ini_set('url_rewriter.tags',        '');
  * of heavily visited sites and may also provide other site caching,
  * security or encryption benefits. If this RokuPal installation operates
  * behind a reverse proxy, this setting should be enabled so that correct
- * IP address information is captured in Drupal's session management,
+ * IP address information is captured in RokuPal's session management,
  * logging, statistics and access management systems; if you are unsure
- * about this setting, do not have a reverse proxy, or Drupal operates in
+ * about this setting, do not have a reverse proxy, or RokuPal operates in
  * a shared hosting environment, this setting should be set to disabled.
  */
 #   'reverse_proxy' => TRUE,
@@ -290,3 +291,9 @@ $conf['update_check_frequency'] = 0;
 $conf['cache_lifetime'] = 0;
 $conf['page_cache_max_age'] = 3600;
 $conf['session_write_interval'] = 300;
+
+
+/**
+ * RokuPal: set to 1 to gzip HTML output when the client accepts it.
+ * $conf['rokupal_gzip'] = 1;
+ */

@@ -1,0 +1,51 @@
+<?php
+/**
+ * @file Schema for RokuPal Guestbook.
+ */
+
+function rokupal_guestbook_schema() {
+  return array(
+    'rokupal_guestbook' => array(
+      'description' => 'Guestbook messages left on a user profile.',
+      'fields' => array(
+        'gid' => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+        'owner_uid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+        'author_uid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+        'body' => array('type' => 'text', 'not null' => TRUE, 'size' => 'big'),
+        'status' => array('type' => 'int', 'not null' => TRUE, 'default' => 1), // 1 published, 0 pending
+        'created' => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
+      ),
+      'primary key' => array('gid'),
+      'indexes' => array(
+        'owner_created' => array('owner_uid', 'created'),
+        'status' => array('status'),
+      ),
+    ),
+  );
+}
+
+function rokupal_guestbook_install() {
+  drupal_install_schema('rokupal_guestbook');
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_guestbook', 0);
+  }
+}
+
+function rokupal_guestbook_uninstall() {
+  // Delete all guestbook content then drop schema.
+  if (db_table_exists('rokupal_guestbook')) {
+    db_query("DELETE FROM {rokupal_guestbook}");
+  }
+  drupal_uninstall_schema('rokupal_guestbook');
+  variable_del('rokupal_guestbook_moderate');
+  variable_del('rokupal_guestbook_per_page');
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_guestbook', defined('SCHEMA_UNINSTALLED') ? SCHEMA_UNINSTALLED : -1);
+  }
+  if (function_exists('menu_rebuild')) {
+    menu_rebuild();
+  }
+  if (function_exists('cache_clear_all')) {
+    cache_clear_all();
+  }
+}

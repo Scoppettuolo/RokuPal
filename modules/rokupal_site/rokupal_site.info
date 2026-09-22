@@ -1,0 +1,6 @@
+name = RokuPal Site
+description = Site helpers: primary menu links, About page, avatars defaults, Getting started block.
+package = RokuPal
+core = 6.x
+version = "1.6.2"
+dependencies[] = rokupal_core

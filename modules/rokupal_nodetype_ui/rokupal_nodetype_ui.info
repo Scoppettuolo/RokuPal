@@ -1,0 +1,6 @@
+name = RokuPal Content Types UI
+description = Enhanced content type settings form.
+package = RokuPal
+core = 6.x
+version = "1.6.2"
+dependencies[] = rokupal_core

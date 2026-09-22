@@ -1,0 +1,6 @@
+name = RokuPal Blocks UI
+description = Improved blocks admin + visual layout.
+package = RokuPal
+core = 6.x
+version = "1.6.2"
+dependencies[] = rokupal_core

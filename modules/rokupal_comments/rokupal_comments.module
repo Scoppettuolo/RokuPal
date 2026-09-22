@@ -1,0 +1,39 @@
+<?php
+/**
+ * @file
+ * Collapsible comment form (extracted from rokupal_core).
+ */
+
+/**
+ * Implements hook_form_alter().
+ */
+function rokupal_comments_form_alter(&$form, $form_state, $form_id) {
+  if ($form_id != 'comment_form') {
+    return;
+  }
+  // Full comment/reply page keeps form expanded.
+  if (arg(0) == 'comment' && arg(1) == 'reply') {
+    return;
+  }
+  $path = drupal_get_path('module', 'rokupal_comments');
+  $form['#prefix'] = (isset($form['#prefix']) ? $form['#prefix'] : '')
+    . '<div class="rp-comment-wrap is-collapsed" id="rp-comment-form-wrap">'
+    . '<button type="button" class="rp-comment-toggle" id="rp-comment-toggle" aria-expanded="false">'
+    . t('Write a comment') . '</button><div class="rp-comment-panel">';
+  $form['#suffix'] = '</div></div>' . (isset($form['#suffix']) ? $form['#suffix'] : '');
+  if (is_file($path . '/css/comment-form.css')) {
+    drupal_add_css($path . '/css/comment-form.css');
+  }
+  if (is_file($path . '/js/comment-form.js')) {
+    drupal_add_js($path . '/js/comment-form.js');
+  }
+}
+
+/**
+ * Implements hook_help().
+ */
+function rokupal_comments_help($section) {
+  if ($section == 'admin/help#rokupal_comments') {
+    return '<p>' . t('Collapses the comment form under nodes into a "Write a comment" button. Disable this module to always show the full form.') . '</p>';
+  }
+}

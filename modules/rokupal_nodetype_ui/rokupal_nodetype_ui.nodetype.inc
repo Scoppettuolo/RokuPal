@@ -4,7 +4,7 @@
  * RokuPal content-type settings — full options (workflow + comments + upload).
  */
 
-function rokupal_core_nodetype_page($type_obj = NULL) {
+function rokupal_nodetype_ui_page($type_obj = NULL) {
   if (is_object($type_obj) && !empty($type_obj->type)) {
     $type = $type_obj->type;
   }
@@ -20,7 +20,7 @@ function rokupal_core_nodetype_page($type_obj = NULL) {
   }
 
   drupal_set_title(t('Edit @name', array('@name' => $info->name)));
-  drupal_add_css(drupal_get_path('module', 'rokupal_core') . '/css/nodetype-admin.css');
+  drupal_add_css(drupal_get_path('module', 'rokupal_nodetype_ui') . '/css/nodetype-admin.css');
   $token = function_exists('drupal_get_token') ? drupal_get_token('rokupal_nodetype') : '';
   $url_type = str_replace('_', '-', $type);
 
@@ -138,7 +138,7 @@ function rokupal_core_nodetype_page($type_obj = NULL) {
 
     $c = (int) variable_get('comment_' . $type, defined('COMMENT_NODE_READ_WRITE') ? COMMENT_NODE_READ_WRITE : 2);
     $out .= '<p><label><strong>' . t('Default comment setting') . '</strong><br /><select name="comment">';
-    $out .= rokupal_core_nt_opts(array(0 => t('Disabled'), 1 => t('Read only'), 2 => t('Read/Write')), $c);
+    $out .= rokupal_nodetype_ui_opts(array(0 => t('Disabled'), 1 => t('Read only'), 2 => t('Read/Write')), $c);
     $out .= '</select></label></p>';
 
     $mode = (int) variable_get('comment_default_mode_' . $type, defined('COMMENT_MODE_THREADED_EXPANDED') ? COMMENT_MODE_THREADED_EXPANDED : 4);
@@ -149,7 +149,7 @@ function rokupal_core_nodetype_page($type_obj = NULL) {
       4 => t('Threaded list - expanded'),
     );
     $out .= '<p><label><strong>' . t('Default display mode') . '</strong><br /><select name="comment_default_mode">';
-    $out .= rokupal_core_nt_opts($modes, $mode);
+    $out .= rokupal_nodetype_ui_opts($modes, $mode);
     $out .= '</select></label></p>';
 
     $order = (int) variable_get('comment_default_order_' . $type, defined('COMMENT_ORDER_NEWEST_FIRST') ? COMMENT_ORDER_NEWEST_FIRST : 1);
@@ -158,18 +158,18 @@ function rokupal_core_nodetype_page($type_obj = NULL) {
       2 => t('Date - oldest first'),
     );
     $out .= '<p><label><strong>' . t('Default display order') . '</strong><br /><select name="comment_default_order">';
-    $out .= rokupal_core_nt_opts($orders, $order);
+    $out .= rokupal_nodetype_ui_opts($orders, $order);
     $out .= '</select></label></p>';
 
     $per = (int) variable_get('comment_default_per_page_' . $type, 50);
     $per_opts = function_exists('_comment_per_page') ? _comment_per_page() : array(10 => 10, 30 => 30, 50 => 50, 70 => 70, 90 => 90, 150 => 150, 200 => 200, 250 => 250, 300 => 300);
     $out .= '<p><label><strong>' . t('Default comments per page') . '</strong><br /><select name="comment_default_per_page">';
-    $out .= rokupal_core_nt_opts($per_opts, $per);
+    $out .= rokupal_nodetype_ui_opts($per_opts, $per);
     $out .= '</select></label></p>';
 
     $controls = (int) variable_get('comment_controls_' . $type, defined('COMMENT_CONTROLS_HIDDEN') ? COMMENT_CONTROLS_HIDDEN : 3);
     $out .= '<p><label><strong>' . t('Comment controls') . '</strong><br /><select name="comment_controls">';
-    $out .= rokupal_core_nt_opts(array(
+    $out .= rokupal_nodetype_ui_opts(array(
       0 => t('Display above the comments'),
       1 => t('Display below the comments'),
       2 => t('Display above and below the comments'),
@@ -179,7 +179,7 @@ function rokupal_core_nodetype_page($type_obj = NULL) {
 
     $anon = (int) variable_get('comment_anonymous_' . $type, defined('COMMENT_ANONYMOUS_MAYNOT_CONTACT') ? COMMENT_ANONYMOUS_MAYNOT_CONTACT : 0);
     $out .= '<p><label><strong>' . t('Anonymous commenting') . '</strong><br /><select name="comment_anonymous">';
-    $out .= rokupal_core_nt_opts(array(
+    $out .= rokupal_nodetype_ui_opts(array(
       0 => t('Anonymous posters may not enter their contact information'),
       1 => t('Anonymous posters may leave their contact information'),
       2 => t('Anonymous posters must leave their contact information'),
@@ -188,17 +188,17 @@ function rokupal_core_nodetype_page($type_obj = NULL) {
 
     $subj = (int) variable_get('comment_subject_field_' . $type, 1);
     $out .= '<p><label><strong>' . t('Comment subject field') . '</strong><br /><select name="comment_subject_field">';
-    $out .= rokupal_core_nt_opts(array(0 => t('Disabled'), 1 => t('Enabled')), $subj);
+    $out .= rokupal_nodetype_ui_opts(array(0 => t('Disabled'), 1 => t('Enabled')), $subj);
     $out .= '</select></label></p>';
 
     $prev = (int) variable_get('comment_preview_' . $type, defined('COMMENT_PREVIEW_REQUIRED') ? COMMENT_PREVIEW_REQUIRED : 1);
     $out .= '<p><label><strong>' . t('Preview comment') . '</strong><br /><select name="comment_preview">';
-    $out .= rokupal_core_nt_opts(array(0 => t('Optional'), 1 => t('Required')), $prev);
+    $out .= rokupal_nodetype_ui_opts(array(0 => t('Optional'), 1 => t('Required')), $prev);
     $out .= '</select></label></p>';
 
     $loc = (int) variable_get('comment_form_location_' . $type, defined('COMMENT_FORM_SEPARATE_PAGE') ? COMMENT_FORM_SEPARATE_PAGE : 0);
     $out .= '<p><label><strong>' . t('Location of comment submission form') . '</strong><br /><select name="comment_form_location">';
-    $out .= rokupal_core_nt_opts(array(
+    $out .= rokupal_nodetype_ui_opts(array(
       0 => t('Display on separate page'),
       1 => t('Display below post or comments'),
     ), $loc);
@@ -212,7 +212,7 @@ function rokupal_core_nodetype_page($type_obj = NULL) {
     $up = (int) variable_get('upload_' . $type, 1);
     $out .= '<fieldset><legend>' . t('File attachments') . '</legend>';
     $out .= '<p><label><strong>' . t('Attachments') . '</strong><br /><select name="upload">';
-    $out .= rokupal_core_nt_opts(array(0 => t('Disabled'), 1 => t('Enabled')), $up);
+    $out .= rokupal_nodetype_ui_opts(array(0 => t('Disabled'), 1 => t('Enabled')), $up);
     $out .= '</select></label></p>';
     $out .= '</fieldset>';
   }
@@ -222,7 +222,7 @@ function rokupal_core_nodetype_page($type_obj = NULL) {
   return $out;
 }
 
-function rokupal_core_nt_opts($options, $selected) {
+function rokupal_nodetype_ui_opts($options, $selected) {
   $html = '';
   foreach ($options as $k => $label) {
     $sel = ((string) $k === (string) $selected) ? ' selected="selected"' : '';

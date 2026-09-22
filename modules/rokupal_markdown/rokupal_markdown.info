@@ -2,5 +2,5 @@ name = RokuPal Markdown
 description = Markdown input format for posts and comments.
 package = RokuPal
 core = 6.x
-version = "1.0.0"
+version = "1.6.2"
 dependencies[] = filter

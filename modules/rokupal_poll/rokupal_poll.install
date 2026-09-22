@@ -1,4 +1,8 @@
 <?php
+/**
+ * @file Install + vote schema for RokuPal Poll.
+ */
+
 function rokupal_poll_schema() {
   return array(
     'rokupal_poll_meta' => array(
@@ -9,17 +13,50 @@ function rokupal_poll_schema() {
       ),
       'primary key' => array('mid'),
     ),
+    'rokupal_poll_votes' => array(
+      'description' => 'Vote tallies per choice.',
+      'fields' => array(
+        'nid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+        'choice_idx' => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
+        'votes' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      ),
+      'primary key' => array('nid', 'choice_idx'),
+    ),
+    'rokupal_poll_ballots' => array(
+      'description' => 'One ballot per user/session per poll.',
+      'fields' => array(
+        'bid' => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+        'nid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+        'uid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+        'sid' => array('type' => 'varchar', 'length' => 64, 'not null' => TRUE, 'default' => ''),
+        'choice_idx' => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
+        'voted' => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
+      ),
+      'primary key' => array('bid'),
+      'indexes' => array(
+        'nid_uid' => array('nid', 'uid'),
+        'nid_sid' => array('nid', 'sid'),
+      ),
+    ),
   );
 }
+
 function rokupal_poll_install() {
   drupal_install_schema('rokupal_poll');
   @db_query("INSERT INTO {rokupal_poll_meta} (name) VALUES ('installed')");
+  rokupal_poll_ensure_type();
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_poll', 0);
+  }
+}
+
+function rokupal_poll_ensure_type() {
   if (!node_get_types('type', 'poll_choice')) {
     $obj = (object) array(
       'type' => 'poll_choice',
       'name' => 'Poll',
       'module' => 'node',
-      'description' => 'Encuesta simple.',
+      'description' => 'Simple poll. Title = question; body = one choice per line.',
       'has_title' => 1,
       'title_label' => 'Question',
       'has_body' => 1,
@@ -28,16 +65,21 @@ function rokupal_poll_install() {
       'custom' => 1,
       'modified' => 1,
       'locked' => 0,
-      'help' => '',
+      'help' => 'Put each answer option on its own line in the body.',
     );
     node_type_save($obj);
     variable_set('node_options_poll_choice', array('status', 'promote'));
     variable_set('comment_poll_choice', 0);
   }
-  if (function_exists('drupal_set_installed_schema_version')) {
-    drupal_set_installed_schema_version('rokupal_poll', 0);
+}
+
+function rokupal_poll_schema_vote_tables() {
+  // Late create if install was old.
+  if (function_exists('drupal_install_schema')) {
+    @drupal_install_schema('rokupal_poll');
   }
 }
+
 function rokupal_poll_uninstall() {
   drupal_uninstall_schema('rokupal_poll');
   variable_del('rokupal_poll_version');

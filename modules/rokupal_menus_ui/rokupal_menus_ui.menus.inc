@@ -4,8 +4,8 @@
  * RokuPal Menus Manager.
  */
 
-function rokupal_core_menus_page($menu_name = NULL) {
-  drupal_add_css(drupal_get_path('module', 'rokupal_core') . '/css/menus-admin.css');
+function rokupal_menus_ui_page($menu_name = NULL) {
+  drupal_add_css(drupal_get_path('module', 'rokupal_menus_ui') . '/css/menus-admin.css');
   $token = function_exists('drupal_get_token') ? drupal_get_token('rokupal_menus') : '';
 
   if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['rokupal_menu_op'])) {
@@ -32,7 +32,7 @@ function rokupal_core_menus_page($menu_name = NULL) {
         if ($mlid) {
           db_query("UPDATE {menu_links} SET p1 = %d WHERE mlid = %d", $mlid, $mlid);
         }
-        rokupal_core_menu_cache_clear();
+        rokupal_menus_ui_cache_clear();
         drupal_set_message(t('Link added.'));
       }
       drupal_goto('admin/build/menu-customize/' . $mname);
@@ -42,7 +42,7 @@ function rokupal_core_menus_page($menu_name = NULL) {
       $mlid = (int) $_POST['mlid'];
       $mname = db_result(db_query("SELECT menu_name FROM {menu_links} WHERE mlid = %d", $mlid));
       db_query("DELETE FROM {menu_links} WHERE mlid = %d", $mlid);
-      rokupal_core_menu_cache_clear();
+      rokupal_menus_ui_cache_clear();
       drupal_set_message(t('Link deleted.'));
       drupal_goto($mname ? 'admin/build/menu-customize/' . $mname : 'admin/build/menu');
     }
@@ -51,7 +51,7 @@ function rokupal_core_menus_page($menu_name = NULL) {
       $mlid = (int) $_POST['mlid'];
       $hidden = (int) db_result(db_query("SELECT hidden FROM {menu_links} WHERE mlid = %d", $mlid));
       db_query("UPDATE {menu_links} SET hidden = %d, customized = 1 WHERE mlid = %d", $hidden ? 0 : 1, $mlid);
-      rokupal_core_menu_cache_clear();
+      rokupal_menus_ui_cache_clear();
       $mname = db_result(db_query("SELECT menu_name FROM {menu_links} WHERE mlid = %d", $mlid));
       drupal_goto($mname ? 'admin/build/menu-customize/' . $mname : 'admin/build/menu');
     }
@@ -60,7 +60,7 @@ function rokupal_core_menus_page($menu_name = NULL) {
       foreach ($_POST['weights'] as $mlid => $w) {
         db_query("UPDATE {menu_links} SET weight = %d, customized = 1 WHERE mlid = %d", (int) $w, (int) $mlid);
       }
-      rokupal_core_menu_cache_clear();
+      rokupal_menus_ui_cache_clear();
       drupal_set_message(t('Order saved.'));
       $mname = isset($_POST['menu_name']) ? preg_replace('/[^a-z0-9\-_]/', '', $_POST['menu_name']) : '';
       drupal_goto($mname ? 'admin/build/menu-customize/' . $mname : 'admin/build/menu');
@@ -68,7 +68,7 @@ function rokupal_core_menus_page($menu_name = NULL) {
   }
 
   if ($menu_name) {
-    return rokupal_core_menu_customize_page($menu_name, $token);
+    return rokupal_menus_ui_customize_page($menu_name, $token);
   }
 
   drupal_set_title(t('Menus'));
@@ -92,7 +92,7 @@ function rokupal_core_menus_page($menu_name = NULL) {
   return $out;
 }
 
-function rokupal_core_menu_customize_page($menu_name, $token) {
+function rokupal_menus_ui_customize_page($menu_name, $token) {
   $menus = function_exists('menu_get_menus') ? menu_get_menus() : array();
   $title = isset($menus[$menu_name]) ? $menus[$menu_name] : $menu_name;
   drupal_set_title(t('Menu: @t', array('@t' => $title)));
@@ -162,7 +162,7 @@ function rokupal_core_menu_customize_page($menu_name, $token) {
   return $out;
 }
 
-function rokupal_core_menu_cache_clear() {
+function rokupal_menus_ui_cache_clear() {
   if (function_exists('menu_cache_clear_all')) {
     menu_cache_clear_all();
   }

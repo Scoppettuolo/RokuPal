@@ -394,3 +394,699 @@ body.admin-menu .rp-header { margin-top: 0; }
     max-height: 56px;
   }
 }
+
+/* RokuPal admin bar */
+#rokupal-admin-bar {
+  background: #1a1a2e;
+  color: #eee;
+  font-size: 13px;
+  line-height: 1.4;
+  position: sticky;
+  top: 0;
+  z-index: 9999;
+  border-bottom: 2px solid #e94560;
+}
+#rokupal-admin-bar .rp-ab-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 6px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+#rokupal-admin-bar .rp-ab-brand {
+  font-weight: 700;
+  color: #e94560;
+  margin-right: 8px;
+}
+#rokupal-admin-bar .rp-ab-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+#rokupal-admin-bar .rp-ab-links a {
+  color: #eee;
+  text-decoration: none;
+}
+#rokupal-admin-bar .rp-ab-links a:hover {
+  color: #e94560;
+}
+body.has-rp-admin-bar {
+  /* optional offset if needed */
+}
+
+/* Empty states & archive */
+.rp-empty {
+  padding: 1.5rem;
+  background: var(--rp-surface, #f6f7f9);
+  border-radius: 8px;
+  text-align: center;
+  color: var(--rp-muted, #555);
+}
+.rp-archive-list { list-style: none; padding: 0; }
+.rp-archive-list li { padding: .35rem 0; border-bottom: 1px solid var(--rp-post-border, #e5e7eb); }
+.rp-archive-count { color: var(--rp-muted, #777); font-size: .9em; }
+.rp-blog-filter { font-size: .9rem; color: var(--rp-muted, #666); }
+
+@media (max-width: 640px) {
+  input[type=text], input[type=password], input[type=email],
+  textarea, select {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .form-item { margin-bottom: 1rem; }
+  #rokupal-admin-bar .rp-ab-links { gap: 2px 8px; font-size: 12px; }
+}
+
+
+
+/* Primary / secondary navigation in header */
+.rp-nav, .rp-primary-links, ul.links.primary-links, .primary-links {
+  list-style: none;
+  margin: .75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem .85rem;
+}
+.rp-nav a, .primary-links a, ul.primary-links a {
+  color: var(--rp-header-link, #99ccff) !important;
+  font-weight: 600;
+  text-decoration: none;
+}
+.rp-nav a:hover, .primary-links a:hover {
+  text-decoration: underline;
+  color: #fff !important;
+}
+
+
+/* Skip link */
+.rp-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: #000;
+  color: #fff;
+  padding: .5rem 1rem;
+  z-index: 10000;
+}
+.rp-skip-link:focus {
+  left: 0;
+}
+
+/* Header search */
+.rp-header-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .75rem 1.25rem;
+  max-width: var(--rp-max, 1140px);
+  margin: 0 auto;
+}
+.rp-search {
+  margin-left: auto;
+}
+.rp-search .form-text {
+  max-width: 12rem;
+  padding: .35rem .5rem;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,.25);
+  background: rgba(255,255,255,.1);
+  color: #fff;
+}
+.rp-search .form-submit {
+  padding: .35rem .7rem;
+  font-size: .85rem;
+}
+
+/* Comments */
+.comment {
+  background: var(--rp-surface, #fff);
+  border: 1px solid var(--rp-border, #d5dbe3);
+  border-radius: var(--rp-radius, 8px);
+  padding: .85rem 1rem;
+  margin-bottom: .85rem;
+}
+.comment-meta { color: var(--rp-muted, #5c6570); font-size: .85rem; margin-bottom: .5rem; }
+.comment-title { margin: 0 0 .25rem; font-size: 1rem; }
+.indented { margin-left: 1.25rem; }
+
+.node-links, .comment-links {
+  margin-top: .75rem;
+  font-size: .9rem;
+}
+.node-links ul.links, .comment-links ul.links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem 1rem;
+}
+
+@media (max-width: 640px) {
+  .rp-header-inner { flex-direction: column; align-items: flex-start; }
+  .rp-search { margin-left: 0; width: 100%; }
+  .rp-search .form-text { max-width: 100%; }
+}
+
+
+/* User pictures / avatars */
+.rp-user-with-pic {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+}
+.rp-user .user-picture,
+.rp-user-with-pic .user-picture {
+  display: inline-block;
+  line-height: 0;
+}
+.rp-user .user-picture img,
+.picture img,
+.user-picture img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+  border: 1px solid var(--rp-border, #d5dbe3);
+}
+.comment .user-picture img {
+  width: 40px;
+  height: 40px;
+}
+
+/* Markdown tables */
+.rp-table-wrap { overflow-x: auto; margin: 1rem 0; }
+.rp-md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .95rem;
+}
+.rp-md-table th, .rp-md-table td {
+  border: 1px solid var(--rp-border, #d5dbe3);
+  padding: .45rem .65rem;
+}
+.rp-md-table th {
+  background: #eef2f7;
+  font-weight: 600;
+}
+.rp-md-table tr:nth-child(even) td { background: #fafbfc; }
+
+/* Breadcrumb */
+.rp-breadcrumb {
+  max-width: var(--rp-max, 1140px);
+  margin: .75rem auto 0;
+  padding: 0 1.25rem;
+  font-size: .85rem;
+  color: var(--rp-muted, #5c6570);
+}
+.rp-breadcrumb a { color: var(--rp-link, #0b5cab); }
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rp-border, #d5dbe3);
+  margin: 1.5rem 0;
+}
+
+
+/* Polls */
+.rp-poll { margin: 1rem 0; }
+.rp-poll-choice {
+  display: block;
+  padding: .45rem .6rem;
+  margin: .25rem 0;
+  background: var(--rp-surface, #f6f7f9);
+  border-radius: 6px;
+  border: 1px solid var(--rp-border, #d5dbe3);
+  cursor: pointer;
+}
+.rp-poll-choice:hover { border-color: var(--rp-accent, #3b5675); }
+.rp-poll-results { list-style: none; padding: 0; margin: 0; }
+.rp-poll-results li {
+  margin: .5rem 0 1rem;
+}
+.rp-poll-bar-wrap {
+  display: block;
+  height: 8px;
+  background: #e8ecf0;
+  border-radius: 4px;
+  margin: .25rem 0;
+  overflow: hidden;
+}
+.rp-poll-bar {
+  display: block;
+  height: 100%;
+  background: var(--rp-accent, #3b5675);
+  border-radius: 4px;
+}
+.rp-poll-pct { font-size: .85rem; color: var(--rp-muted, #5c6570); }
+
+
+/* Markdown task lists */
+ul.rp-task-list { list-style: none; padding-left: 0.25rem; }
+ul.rp-task-list li.rp-task { margin: 0.25rem 0; }
+ul.rp-task-list input[type=checkbox] { margin-right: 0.4rem; vertical-align: middle; }
+.rp-md-tip {
+  font-size: 0.85rem;
+  color: var(--rp-muted, #5c6570);
+  margin: 0.35rem 0 0.75rem;
+  padding: 0.4rem 0.6rem;
+  background: #f0f4f8;
+  border-radius: 6px;
+}
+
+
+/* Markdown spoiler */
+.rp-spoiler {
+  background: #1a1d23;
+  color: #1a1d23;
+  border-radius: 4px;
+  padding: 0 .2em;
+  cursor: help;
+}
+.rp-spoiler:hover, .rp-spoiler:focus {
+  color: #eee;
+}
+
+
+/* —— Search form in header (fix broken layout) —— */
+#search-theme-form,
+form#search-theme-form,
+.rp-header-search form,
+#header form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+}
+#search-theme-form .form-item,
+#search-theme-form .form-item label {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+#search-theme-form label {
+  color: rgba(255,255,255,0.85);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+#search-theme-form input.form-text,
+#search-theme-form input[type="text"] {
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 6px;
+  color: #fff;
+  padding: 0.35rem 0.6rem;
+  min-width: 10rem;
+  height: 2rem;
+  box-sizing: border-box;
+}
+#search-theme-form input.form-submit,
+#search-theme-form button {
+  background: var(--rp-accent, #3d7ea6);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  padding: 0.35rem 0.85rem;
+  height: 2rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+#search-theme-form .form-submit:hover {
+  filter: brightness(1.08);
+}
+
+/* —— Navigation: hide list bullets / menu dots —— */
+#navigation ul,
+#navigation li,
+.primary-links,
+.primary-links li,
+ul.menu,
+ul.menu li,
+.block ul.menu,
+.block .item-list ul,
+.block .item-list li {
+  list-style: none;
+  list-style-type: none;
+}
+#navigation ul,
+.primary-links,
+ul.menu,
+.block .item-list ul {
+  margin: 0;
+  padding-left: 0;
+}
+.block .item-list li,
+.block ul.menu li {
+  padding: 0.2rem 0;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.block .item-list li:last-child,
+.block ul.menu li:last-child {
+  border-bottom: none;
+}
+/* Drupal expanded/collapsed menu markers */
+.block ul.menu li.expanded,
+.block ul.menu li.collapsed,
+.block ul.menu li.leaf {
+  list-style: none;
+  list-style-image: none;
+  background: none;
+  padding-left: 0;
+}
+
+/* Forum manage form */
+.rp-forum-manage-form input[type="text"],
+.rp-forum-manage-form select {
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #c5cdd6;
+}
+
+
+/* ========== 1.5.8 UI fixes ========== */
+
+/* Search: one row, hide "Search this site:" label */
+.rp-search,
+#header .rp-search {
+  display: flex !important;
+  align-items: center;
+  margin: 0;
+}
+#search-theme-form,
+.rp-search #search-theme-form {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 0.35rem;
+  margin: 0 !important;
+  padding: 0;
+}
+#search-theme-form > div {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  margin: 0 !important;
+  gap: 0.35rem;
+}
+#search-theme-form .form-item {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center;
+}
+#search-theme-form label,
+#search-theme-form .form-item label {
+  display: none !important;
+  position: absolute !important;
+  left: -9999px !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+}
+#search-theme-form input.form-text,
+#search-theme-form input[type="text"],
+#search-theme-form #edit-search-theme-form-1 {
+  display: inline-block !important;
+  width: 11rem !important;
+  max-width: 40vw;
+  height: 2rem !important;
+  margin: 0 !important;
+  padding: 0 0.55rem !important;
+  background: rgba(255,255,255,0.12) !important;
+  border: 1px solid rgba(255,255,255,0.28) !important;
+  border-radius: 6px !important;
+  color: #fff !important;
+  box-sizing: border-box !important;
+  vertical-align: middle;
+}
+#search-theme-form input.form-submit,
+#search-theme-form .form-submit {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  height: 2rem !important;
+  min-width: 2rem;
+  margin: 0 !important;
+  padding: 0 0.65rem !important;
+  background: var(--rp-accent, #3d7ea6) !important;
+  border: none !important;
+  border-radius: 6px !important;
+  color: #fff !important;
+  cursor: pointer;
+  font-size: 0.8rem !important;
+  line-height: 1 !important;
+  vertical-align: middle;
+}
+
+/* Menus / blocks: no bullets, no centered dots, left-aligned */
+.block ul,
+.block .item-list ul,
+.block ul.menu,
+.block .content ul,
+#region-left ul,
+#region-right ul,
+.sidebar ul,
+.sidebar .item-list ul,
+.sidebar ul.menu {
+  list-style: none !important;
+  list-style-type: none !important;
+  list-style-image: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: left !important;
+}
+.block li,
+.block .item-list li,
+.block ul.menu li,
+.sidebar li,
+.sidebar .item-list li,
+.sidebar ul.menu li {
+  list-style: none !important;
+  list-style-type: none !important;
+  list-style-image: none !important;
+  background-image: none !important;
+  margin: 0 !important;
+  padding: 0.28rem 0 !important;
+  text-align: left !important;
+}
+.block ul.menu li.leaf,
+.block ul.menu li.expanded,
+.block ul.menu li.collapsed {
+  list-style: none !important;
+  list-style-image: none !important;
+  background: none !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+}
+/* Drupal core often uses background bullet on .leaf */
+li.leaf,
+li.expanded,
+li.collapsed {
+  list-style: none !important;
+  list-style-image: none !important;
+  background: none !important;
+  padding-left: 0 !important;
+}
+
+
+/* ========== 1.5.9 aesthetic ========== */
+
+/* Core system.css uses .item-list ul li { list-style: disc; margin-left: 1.5em }
+   That is what draws the dots in sidebar blocks. Override hard. */
+.rp-sidebar .item-list ul,
+.rp-sidebar .item-list ul li,
+.rp-sidebar .block .item-list ul,
+.rp-sidebar .block .item-list ul li,
+.rp-sidebar .block ul,
+.rp-sidebar .block ul li,
+.rp-sidebar ul.menu,
+.rp-sidebar ul.menu li,
+.rp-region-header .item-list ul li,
+aside.rp-sidebar .item-list ul li,
+aside .item-list ul li {
+  list-style: none !important;
+  list-style-type: none !important;
+  list-style-image: none !important;
+  background: none !important;
+  background-image: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  text-align: left !important;
+}
+
+.rp-sidebar .item-list ul,
+.rp-sidebar .block .content > ul,
+.rp-sidebar .block ul.menu {
+  margin: 0 !important;
+  padding: 0.15rem 0 !important;
+}
+
+.rp-sidebar .item-list ul li,
+.rp-sidebar .block ul li,
+.rp-sidebar ul.menu li {
+  padding: 0.3rem 0 !important;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.rp-sidebar .item-list ul li:last-child,
+.rp-sidebar .block ul li:last-child {
+  border-bottom: none;
+}
+
+/* Navigation menu block (user login / navigation) */
+.block-menu .content ul.menu li,
+.block-user .content ul.menu li {
+  list-style: none !important;
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* Nested menu levels: slight indent, still no bullets */
+.rp-sidebar ul.menu ul {
+  margin: 0.15rem 0 0.15rem 0.75rem !important;
+  padding: 0 !important;
+}
+
+/* —— Search: single compact control —— */
+.rp-header-inner .rp-search {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.rp-search form,
+.rp-search #search-theme-form,
+#search-theme-form {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 0.3rem;
+  margin: 0 !important;
+}
+.rp-search .container-inline,
+#search-theme-form .container-inline,
+#search .container-inline {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 0.3rem;
+  margin: 0 !important;
+}
+.rp-search label,
+#search-theme-form label,
+#search label,
+.rp-search .form-item label {
+  /* hide "Search this site:" */
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0,0,0,0) !important;
+  border: 0 !important;
+}
+.rp-search .form-item,
+#search-theme-form .form-item {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+}
+.rp-search input.form-text,
+#search-theme-form input.form-text {
+  width: 10.5rem !important;
+  height: 2rem !important;
+  margin: 0 !important;
+  padding: 0 0.55rem !important;
+  border-radius: 6px 0 0 6px !important;
+  border: 1px solid rgba(255,255,255,0.28) !important;
+  border-right: none !important;
+  background: rgba(255,255,255,0.1) !important;
+  color: #fff !important;
+}
+.rp-search input.form-submit,
+#search-theme-form input.form-submit {
+  height: 2rem !important;
+  margin: 0 !important;
+  padding: 0 0.7rem !important;
+  border-radius: 0 6px 6px 0 !important;
+  border: 1px solid rgba(255,255,255,0.28) !important;
+  background: var(--rp-accent, #3d7ea6) !important;
+  color: #fff !important;
+  font-size: 0.85rem !important;
+}
+
+/* Breadcrumb cleaner */
+.rp-breadcrumb,
+.breadcrumb {
+  font-size: 0.85rem;
+  opacity: 0.85;
+  margin: 0.5rem 0 1rem;
+}
+
+/* Admin messages less huge */
+.messages, div.messages {
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  margin: 0 0 1rem;
+}
+
+
+/* Wall + Guestbook */
+.rp-wall-entry, .rp-gb-entry {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin: 0 0 0.75rem;
+}
+.rp-wall-meta, .rp-gb-meta {
+  font-size: 0.85rem;
+  color: #5c6570;
+  margin-bottom: 0.35rem;
+}
+.rp-wall-body, .rp-gb-body {
+  line-height: 1.45;
+}
+.rp-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  background: #f0c14b;
+  color: #333;
+  border-radius: 4px;
+  padding: 0.05rem 0.35rem;
+  margin-left: 0.25rem;
+}
+
+/* Block admin region hints (when demo mode shows region names) */
+.block-region {
+  background: #e8eef4 !important;
+  color: #3d4a57 !important;
+  font-size: 0.75rem !important;
+  letter-spacing: 0.02em;
+}
+
+.rp-sticky {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #3d7ea6;
+  color: #fff;
+  border-radius: 3px;
+  padding: 0.1rem 0.35rem;
+  margin-right: 0.25rem;
+  vertical-align: middle;
+}

@@ -4,7 +4,7 @@
  * RokuPal Blocks Manager — regions + HTML5 drag-and-drop.
  */
 
-function rokupal_core_blocks_page() {
+function rokupal_blocks_ui_page() {
   // Refresh theme .info regions (new regions in rokupal.info)
   if (function_exists('list_themes')) {
     list_themes(TRUE);
@@ -13,7 +13,7 @@ function rokupal_core_blocks_page() {
     @system_theme_data();
   }
 
-  $path = drupal_get_path('module', 'rokupal_core');
+  $path = drupal_get_path('module', 'rokupal_blocks_ui');
   drupal_add_css($path . '/css/blocks-admin.css');
   drupal_add_js($path . '/js/blocks-dnd.js');
   drupal_set_title(t('Blocks'));
@@ -58,7 +58,7 @@ function rokupal_core_blocks_page() {
             list($module, $delta) = explode(':', $id, 2);
             $module = preg_replace('/[^a-z0-9_]/', '', $module);
             $status = ($region === '') ? 0 : 1;
-            rokupal_core_block_place($theme, $module, $delta, $region, $weight, $status);
+            rokupal_blocks_ui_place($theme, $module, $delta, $region, $weight, $status);
             $weight++;
           }
         }
@@ -75,7 +75,7 @@ function rokupal_core_blocks_page() {
       }
       $weight = isset($_POST['weight']) ? (int) $_POST['weight'] : 0;
       $status = ($region === '') ? 0 : 1;
-      rokupal_core_block_place($theme, $module, $delta, $region, $weight, $status);
+      rokupal_blocks_ui_place($theme, $module, $delta, $region, $weight, $status);
       cache_clear_all();
       drupal_set_message(t('Block saved.'));
     }
@@ -164,7 +164,7 @@ function rokupal_core_blocks_page() {
   return $out;
 }
 
-function rokupal_core_block_place($theme, $module, $delta, $region, $weight, $status) {
+function rokupal_blocks_ui_place($theme, $module, $delta, $region, $weight, $status) {
   $exists = db_result(db_query("SELECT module FROM {blocks} WHERE module = '%s' AND delta = '%s' AND theme = '%s'", $module, $delta, $theme));
   if ($exists) {
     db_query("UPDATE {blocks} SET region = '%s', status = %d, weight = %d WHERE module = '%s' AND delta = '%s' AND theme = '%s'",

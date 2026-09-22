@@ -3,19 +3,38 @@
  * RokuPal page — flexible regions + logo.
  */
 ?><!DOCTYPE html>
-<html lang="<?php print isset($language->language) ? $language->language : 'en'; ?>">
+<html lang="<?php print (isset($language) && is_object($language) && !empty($language->language)) ? $language->language : 'en'; ?>">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title><?php print $head_title; ?></title>
   <?php print $head; ?>
   <?php print $styles; ?>
+  <?php
+    // Fallback: absolute-from-site-root CSS links (fixes "unstyled list" when $styles is empty/wrong path).
+    $rp_theme = function_exists('path_to_theme') ? path_to_theme() : 'themes/rokupal';
+    $rp_base = function_exists('base_path') ? base_path() : '/';
+    $rp_css = array('style.css', 'layout.css', 'css/base.css', 'css/layout.css', 'css/components.css');
+    if (function_exists('arg') && arg(0) === 'forum') { $rp_css[] = 'css/forum.css'; }
+    foreach ($rp_css as $rp_f) {
+      $rp_path = $rp_theme . '/' . $rp_f;
+      // Prefer filesystem check relative to site root.
+      if (is_file($rp_path) || is_file('themes/rokupal/' . $rp_f)) {
+        $href = $rp_base . (is_file($rp_path) ? $rp_path : 'themes/rokupal/' . $rp_f);
+        // Avoid double-print if already in $styles (harmless duplicate is ok for reliability).
+        print '<link type="text/css" rel="stylesheet" media="all" href="' . htmlspecialchars($href, ENT_QUOTES, 'UTF-8') . '" />' . "
+  ";
+      }
+    }
+  ?>
   <?php if (!empty($rokupal_color_css)): ?>
   <style type="text/css" id="rokupal-color-vars"><?php print $rokupal_color_css; ?></style>
   <?php endif; ?>
   <?php print $scripts; ?>
 </head>
 <body class="<?php print !empty($body_classes) ? $body_classes : 'rokupal'; ?>">
+  <a class="rp-skip-link" href="#main-content"><?php print t('Skip to content'); ?></a>
+  <?php if (!empty($rokupal_admin_bar)) { print $rokupal_admin_bar; } ?>
   <div class="rp-page">
     <header class="rp-header" role="banner">
       <div class="rp-header-inner">
@@ -46,6 +65,9 @@
             <?php if (!empty($secondary_links)): ?><?php print theme('links', $secondary_links, array('class' => 'rp-secondary')); ?><?php endif; ?>
           </nav>
         <?php endif; ?>
+        <?php if (!empty($search_box)): ?>
+          <div class="rp-search"><?php print $search_box; ?></div>
+        <?php endif; ?>
       </div>
       <?php if (!empty($header)): ?><div class="rp-region-header"><?php print $header; ?></div><?php endif; ?>
       <?php if (!empty($header_first) || !empty($header_second)): ?>
@@ -69,7 +91,7 @@
         <aside class="rp-sidebar rp-sidebar-first" role="complementary"><?php print $left; ?></aside>
       <?php endif; ?>
 
-      <main class="rp-content" role="main">
+      <main id="main-content" class="rp-content" role="main" tabindex="-1">
         <?php if (!empty($tabs)): ?><div class="rp-tabs"><?php print $tabs; ?></div><?php endif; ?>
         <?php if (!empty($messages)): ?><?php print $messages; ?><?php endif; ?>
         <?php if (!empty($help)): ?><div class="rp-help"><?php print $help; ?></div><?php endif; ?>
@@ -101,7 +123,7 @@
         <a href="https://github.com/Scoppettuolo" rel="noopener">GitHub</a>
         ·
         <a href="https://katnya.blogspot.com/" rel="noopener">Katnya</a>
-        · RokuPal 1.0
+        · RokuPal 1.5.3
       </div>
     </footer>
   </div>

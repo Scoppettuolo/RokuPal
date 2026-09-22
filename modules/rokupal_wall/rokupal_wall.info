@@ -1,0 +1,6 @@
+name = RokuPal Wall
+description = Per-user wall/status feed. Disable or uninstall to remove (deletes wall posts).
+package = RokuPal
+core = 6.x
+version = "1.6.2"
+dependencies[] = user

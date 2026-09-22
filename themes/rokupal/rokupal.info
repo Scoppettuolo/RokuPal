@@ -1,11 +1,19 @@
 name = RokuPal
-description = Official RokuPal 1.0 theme. Configure colors at admin/settings/color.
+description = Official RokuPal theme. Colors at admin/settings/color.
 core = 6.x
-version = "1.0.0"
+version = "1.6.2"
 engine = phptemplate
-stylesheets[all][] = style.css
 
-; Extra regions for flexible block placement
+; Core look (order matters)
+stylesheets[all][] = style.css
+stylesheets[all][] = layout.css
+stylesheets[all][] = css/base.css
+stylesheets[all][] = css/layout.css
+stylesheets[all][] = css/components.css
+stylesheets[all][] = css/forum.css
+
+scripts[] = js/rokupal.js
+
 regions[header] = Header
 regions[header_first] = Header first
 regions[header_second] = Header second

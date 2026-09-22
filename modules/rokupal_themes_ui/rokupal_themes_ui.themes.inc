@@ -4,7 +4,7 @@
  * RokuPal themes manager.
  */
 
-function rokupal_core_themes_page() {
+function rokupal_themes_ui_page() {
   drupal_set_title(t('Themes'));
   $token = function_exists('drupal_get_token') ? drupal_get_token('rokupal_themes') : '';
 

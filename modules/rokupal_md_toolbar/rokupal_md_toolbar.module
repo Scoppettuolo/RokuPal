@@ -1,0 +1,73 @@
+<?php
+/**
+ * @file
+ * Lightweight Markdown insert toolbar (NyaWord-inspired buttons, web/MD version).
+ */
+
+function rokupal_md_toolbar_help($section) {
+  if ($section == 'admin/help#rokupal_md_toolbar') {
+    return '<p>' . t('Adds Bold, Italic, Code, Link, List buttons above textareas when writing nodes or comments. Does not depend on a WYSIWYG; inserts Markdown syntax. Disable or uninstall anytime.') . '</p>';
+  }
+}
+
+function rokupal_md_toolbar_init() {
+  // Assets loaded only when form_alter decides to show toolbar.
+}
+
+function rokupal_md_toolbar_form_alter(&$form, $form_state, $form_id) {
+  $on_nodes = variable_get('rokupal_md_toolbar_nodes', 1);
+  $on_comments = variable_get('rokupal_md_toolbar_comments', 1);
+
+  $attach = FALSE;
+  if ($on_nodes && (strpos($form_id, '_node_form') !== FALSE)) {
+    $attach = TRUE;
+  }
+  if ($on_comments && $form_id == 'comment_form') {
+    $attach = TRUE;
+  }
+  if (!$attach) {
+    return;
+  }
+
+  $path = drupal_get_path('module', 'rokupal_md_toolbar');
+  drupal_add_css($path . '/css/md-toolbar.css');
+  drupal_add_js($path . '/js/md-toolbar.js');
+
+  // Markup bar injected as prefix on body field when present.
+  $bar = '<div class="rp-md-toolbar" role="toolbar" aria-label="' . check_plain(t('Markdown')) . '">'
+    . '<button type="button" class="rp-md-btn" data-md="bold" title="Bold">B</button>'
+    . '<button type="button" class="rp-md-btn" data-md="italic" title="Italic"><em>I</em></button>'
+    . '<button type="button" class="rp-md-btn" data-md="strike" title="Strikethrough">S</button>'
+    . '<button type="button" class="rp-md-btn" data-md="code" title="Code">&lt;/&gt;</button>'
+    . '<button type="button" class="rp-md-btn" data-md="link" title="Link">Link</button>'
+    . '<button type="button" class="rp-md-btn" data-md="ul" title="List">• List</button>'
+    . '<button type="button" class="rp-md-btn" data-md="ol" title="Numbered">1. List</button>'
+    . '<button type="button" class="rp-md-btn" data-md="quote" title="Quote">“</button>'
+    . '<button type="button" class="rp-md-btn" data-md="h2" title="Heading">H2</button>'
+    . '<span class="rp-md-hint">' . t('Markdown') . '</span>'
+    . '</div>';
+
+  // Prefer body field.
+  if (isset($form['body_filter']['body'])) {
+    $prev = isset($form['body_filter']['body']['#prefix']) ? $form['body_filter']['body']['#prefix'] : '';
+    $form['body_filter']['body']['#prefix'] = $bar . $prev;
+    $form['body_filter']['body']['#attributes']['class'] = (isset($form['body_filter']['body']['#attributes']['class']) ? $form['body_filter']['body']['#attributes']['class'] . ' ' : '') . 'rp-md-target';
+  }
+  elseif (isset($form['body'])) {
+    $prev = isset($form['body']['#prefix']) ? $form['body']['#prefix'] : '';
+    $form['body']['#prefix'] = $bar . $prev;
+    if (!isset($form['body']['#attributes'])) {
+      $form['body']['#attributes'] = array();
+    }
+    $form['body']['#attributes']['class'] = (isset($form['body']['#attributes']['class']) ? $form['body']['#attributes']['class'] . ' ' : '') . 'rp-md-target';
+  }
+  // Comment body.
+  if (isset($form['comment_filter']['comment'])) {
+    $prev = isset($form['comment_filter']['comment']['#prefix']) ? $form['comment_filter']['comment']['#prefix'] : '';
+    $form['comment_filter']['comment']['#prefix'] = $bar . $prev;
+  }
+  elseif (isset($form['comment'])) {
+    $prev = isset($form['comment']['#prefix']) ? $form['comment']['#prefix'] : '';
+    $form['comment']['#prefix'] = $bar . $prev;
+  }
+}

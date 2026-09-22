@@ -1,0 +1,51 @@
+<?php
+/**
+ * @file
+ * Unified input formats (Filtered HTML + Full HTML).
+ */
+
+function rokupal_formats_enable() {
+  rokupal_formats_ensure_filtered();
+  rokupal_formats_ensure_full();
+}
+
+function rokupal_formats_ensure_filtered() {
+  $roles = ',' . DRUPAL_ANONYMOUS_RID . ',' . DRUPAL_AUTHENTICATED_RID . ',';
+  $fmt = db_result(db_query("SELECT format FROM {filter_formats} WHERE name = 'Filtered HTML'"));
+  if (!$fmt) {
+    db_query("INSERT INTO {filter_formats} (name, roles, cache) VALUES ('%s', '%s', %d)", 'Filtered HTML', $roles, 1);
+    $fmt = db_last_insert_id('filter_formats', 'format');
+    // filter_html, filter_autop, filter_url roughly via deltas used by core filter module
+    db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, 'filter', 0, 0)", $fmt);
+    db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, 'filter', 1, 1)", $fmt);
+    db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, 'filter', 2, 2)", $fmt);
+  }
+  else {
+    db_query("UPDATE {filter_formats} SET roles = '%s' WHERE format = %d", $roles, $fmt);
+  }
+  variable_set('rokupal_format_filtered_id', $fmt);
+  return $fmt;
+}
+
+function rokupal_formats_ensure_full() {
+  $roles = ',' . DRUPAL_AUTHENTICATED_RID . ',';
+  $fmt = db_result(db_query("SELECT format FROM {filter_formats} WHERE name = 'Full HTML'"));
+  if (!$fmt) {
+    db_query("INSERT INTO {filter_formats} (name, roles, cache) VALUES ('%s', '%s', %d)", 'Full HTML', $roles, 1);
+    $fmt = db_last_insert_id('filter_formats', 'format');
+    db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, 'filter', 2, 0)", $fmt);
+    db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, 'filter', 1, 1)", $fmt);
+    db_query("INSERT INTO {filters} (format, module, delta, weight) VALUES (%d, 'filter', 3, 10)", $fmt);
+  }
+  else {
+    db_query("UPDATE {filter_formats} SET roles = '%s' WHERE format = %d", $roles, $fmt);
+  }
+  variable_set('rokupal_format_full_id', $fmt);
+  return $fmt;
+}
+
+function rokupal_formats_help($section) {
+  if ($section == 'admin/help#rokupal_formats') {
+    return '<p>' . t('Creates and maintains <em>Filtered HTML</em> (anonymous + authenticated) and <em>Full HTML</em> (authenticated) formats. Prefer Markdown for most posts.') . '</p>';
+  }
+}

@@ -13,15 +13,27 @@ function rokupal_profile_modules() {
     'taxonomy',
     'dblog',
     'search',
+    'filter',
     'rokupal_core',
+    'rokupal_admin_bar',
+    'rokupal_site',
+    'rokupal_modules_ui',
+    'rokupal_blocks_ui',
+    'rokupal_menus_ui',
+    'rokupal_nodetype_ui',
+    'rokupal_themes_ui',
+    'rokupal_comments',
+    'rokupal_branding',
     'rokupal_blog',
+    'rokupal_markdown',
+    'rokupal_formats',
   );
 }
 
 function rokupal_profile_details() {
   return array(
     'name' => 'RokuPal',
-    'description' => 'RokuPal: tema propio + blog estilo WordPress por defecto (bloques y sidebar). Forum y Poll se activan aparte si se necesitan.',
+    'description' => 'RokuPal 1.5.3: tema propio + blog estilo WordPress + Markdown por defecto. Forum y Poll se activan aparte si se necesitan.',
   );
 }
 
@@ -112,7 +124,7 @@ function rokupal_profile_tasks(&$task, $url) {
     rokupal_blog_setup_blocks();
   }
 
-  // Hide default Drupal welcome by never using empty front node list for anon
+  // Hide default welcome by never using empty front node list for anon
   variable_set('rokupal_hide_welcome', 1);
 
   menu_rebuild();

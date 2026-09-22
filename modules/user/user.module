@@ -25,6 +25,61 @@ if (!defined('EMAIL_MAX_LENGTH')) define('EMAIL_MAX_LENGTH', 254);
  * @param $category
  *   The category of user information being acted upon.
  */
+
+/**
+ * Hash a password using PHP password_hash (bcrypt on PHP 8.0).
+ */
+function rokupal_user_hash_password($password) {
+  return password_hash((string) $password, PASSWORD_DEFAULT);
+}
+
+/**
+ * Check a password against a stored hash.
+ * Supports legacy Drupal 6 md5 hashes and modern password_hash hashes.
+ * Returns TRUE on match. When $account is provided and the hash was legacy,
+ * the password is re-hashed and saved automatically.
+ *
+ * @param string $password
+ *   Plain-text password.
+ * @param string $hash
+ *   Stored hash from {users}.pass.
+ * @param object|null $account
+ *   Optional user object; if provided and hash was md5, rehash is persisted.
+ */
+function rokupal_user_check_password($password, $hash, $account = NULL) {
+  $password = (string) $password;
+  $hash = (string) $hash;
+
+  // Modern password_hash format (starts with $2y$ / $2a$ / $argon, etc.)
+  if (strlen($hash) > 32 && (strpos($hash, '$') === 0 || strpos($hash, '$2') === 0 || strpos($hash, '$argon') === 0)) {
+    if (password_verify($password, $hash)) {
+      // Optional: rehash if algorithm/cost changed.
+      if (password_needs_rehash($hash, PASSWORD_DEFAULT) && $account && !empty($account->uid)) {
+        $new = rokupal_user_hash_password($password);
+        db_query("UPDATE {users} SET pass = '%s' WHERE uid = %d", $new, $account->uid);
+      }
+      return TRUE;
+    }
+    return FALSE;
+  }
+
+  // Legacy Drupal 6: plain md5 (32 hex chars)
+  if (strlen($hash) === 32 && ctype_xdigit($hash)) {
+    if (md5($password) === $hash) {
+      // Migrate to modern hash on successful login.
+      if ($account && !empty($account->uid)) {
+        $new = rokupal_user_hash_password($password);
+        db_query("UPDATE {users} SET pass = '%s' WHERE uid = %d", $new, $account->uid);
+      }
+      return TRUE;
+    }
+    return FALSE;
+  }
+
+  return FALSE;
+}
+
+
 function user_module_invoke($op, &$edit, &$account, $category = NULL) {
   foreach (module_list() as $module) {
     $function = $module .'_user';
@@ -154,6 +209,7 @@ function user_load($user_info = array()) {
   // Dynamically compose a SQL query:
   $query = array();
   $params = array();
+  $pass_to_check = NULL;
 
   if (is_numeric($user_info)) {
     $user_info = array('uid' => $user_info);
@@ -168,18 +224,32 @@ function user_load($user_info = array()) {
       $params[] = $value;
     }
     else if ($key == 'pass') {
-      $query[] = "pass = '%s'";
-      $params[] = md5($value);
+      // Password is verified in PHP after load (supports bcrypt + legacy md5).
+      $pass_to_check = $value;
+      continue;
     }
     else {
       $query[]= "LOWER($key) = LOWER('%s')";
       $params[] = $value;
     }
   }
+
+  // Avoid empty WHERE (should not happen in normal flows).
+  if (empty($query)) {
+    return FALSE;
+  }
+
   $result = db_query('SELECT * FROM {users} u WHERE '. implode(' AND ', $query), $params);
 
   if ($user = db_fetch_object($result)) {
     $user = drupal_unpack($user);
+
+    // If a password was supplied, verify it (modern or legacy hash).
+    if (isset($pass_to_check)) {
+      if (!rokupal_user_check_password($pass_to_check, $user->pass, $user)) {
+        return FALSE;
+      }
+    }
 
     $user->roles = array();
     if ($user->uid) {
@@ -237,7 +307,7 @@ function user_save($account, $array = array(), $category = 'account') {
     foreach ($array as $key => $value) {
       if ($key == 'pass' && !empty($value)) {
         $query .= "$key = '%s', ";
-        $v[] = md5($value);
+        $v[] = rokupal_user_hash_password($value);
       }
       else if ((substr($key, 0, 4) !== 'auth') && ($key != 'pass')) {
         if (in_array($key, $user_fields)) {
@@ -320,7 +390,7 @@ function user_save($account, $array = array(), $category = 'account') {
       switch ($key) {
         case 'pass':
           $fields[] = $key;
-          $values[] = md5($value);
+          $values[] = rokupal_user_hash_password($value);
           $s[] = "'%s'";
           break;
         case 'mode':       case 'sort':     case 'timezone':

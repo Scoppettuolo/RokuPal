@@ -1,6 +1,7 @@
-name = Filtered HTML format
-description = Optional Filtered HTML input format (enable only if you need it).
+name = RokuPal Format Filtered (legacy)
+description = Legacy stub — use RokuPal Input Formats instead. Kept so existing sites do not break.
 package = RokuPal
 core = 6.x
-version = "1.0.0"
-dependencies[] = filter
+version = "1.6.2"
+dependencies[] = rokupal_formats
+hidden = TRUE

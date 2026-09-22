@@ -1,0 +1,32 @@
+<?php
+/**
+ * @file RokuPal Menus UI.
+ */
+
+/**
+ * Implements hook_help().
+ */
+function rokupal_menus_ui_help($section) {
+  if ($section == 'admin/build/menu' || strpos($section, 'admin/build/menu') === 0) {
+    return '<p>' . t('Create and edit site menus and links.') . '</p>';
+  }
+}
+
+
+function rokupal_menus_ui_menu_alter(&$items) {
+  $path = drupal_get_path('module', 'rokupal_menus_ui');
+  $file = 'rokupal_menus_ui.menus.inc';
+  if (isset($items['admin/build/menu'])) {
+    $items['admin/build/menu']['page callback'] = 'rokupal_menus_ui_page';
+    $items['admin/build/menu']['page arguments'] = array();
+    $items['admin/build/menu']['file'] = $file;
+    $items['admin/build/menu']['file path'] = $path;
+    $items['admin/build/menu']['module'] = 'rokupal_menus_ui';
+  }
+  // Customize path uses menu name argument.
+  if (isset($items['admin/build/menu-customize/%menu'])) {
+    $items['admin/build/menu-customize/%menu']['page callback'] = 'rokupal_menus_ui_customize_page';
+    $items['admin/build/menu-customize/%menu']['file'] = $file;
+    $items['admin/build/menu-customize/%menu']['file path'] = $path;
+  }
+}

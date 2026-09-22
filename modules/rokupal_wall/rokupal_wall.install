@@ -1,0 +1,46 @@
+<?php
+/**
+ * @file Schema for RokuPal Wall.
+ */
+
+function rokupal_wall_schema() {
+  return array(
+    'rokupal_wall' => array(
+      'description' => 'User wall posts.',
+      'fields' => array(
+        'wid' => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+        'uid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+        'body' => array('type' => 'text', 'not null' => TRUE, 'size' => 'big'),
+        'created' => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
+      ),
+      'primary key' => array('wid'),
+      'indexes' => array(
+        'uid_created' => array('uid', 'created'),
+      ),
+    ),
+  );
+}
+
+function rokupal_wall_install() {
+  drupal_install_schema('rokupal_wall');
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_wall', 0);
+  }
+}
+
+function rokupal_wall_uninstall() {
+  if (db_table_exists('rokupal_wall')) {
+    db_query("DELETE FROM {rokupal_wall}");
+  }
+  drupal_uninstall_schema('rokupal_wall');
+  variable_del('rokupal_wall_per_page');
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_wall', defined('SCHEMA_UNINSTALLED') ? SCHEMA_UNINSTALLED : -1);
+  }
+  if (function_exists('menu_rebuild')) {
+    menu_rebuild();
+  }
+  if (function_exists('cache_clear_all')) {
+    cache_clear_all();
+  }
+}

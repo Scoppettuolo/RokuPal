@@ -1,0 +1,20 @@
+<?php
+/**
+ * No schema — UI only. Uninstall clears variables.
+ */
+function rokupal_md_toolbar_install() {
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_md_toolbar', 0);
+  }
+}
+
+function rokupal_md_toolbar_uninstall() {
+  variable_del('rokupal_md_toolbar_comments');
+  variable_del('rokupal_md_toolbar_nodes');
+  if (function_exists('drupal_set_installed_schema_version')) {
+    drupal_set_installed_schema_version('rokupal_md_toolbar', defined('SCHEMA_UNINSTALLED') ? SCHEMA_UNINSTALLED : -1);
+  }
+  if (function_exists('cache_clear_all')) {
+    cache_clear_all();
+  }
+}

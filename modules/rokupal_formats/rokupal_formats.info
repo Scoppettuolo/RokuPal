@@ -1,0 +1,6 @@
+name = RokuPal Input Formats
+description = Ensures Filtered HTML and Full HTML input formats (replaces format_filtered + format_full).
+package = RokuPal
+core = 6.x
+version = "1.6.2"
+dependencies[] = filter

@@ -322,8 +322,11 @@ function conf_path($require_settings = TRUE, $reset = FALSE) {
   }
 
   $confdir = 'sites';
-  $uri = explode('/', $_SERVER['SCRIPT_NAME'] ? $_SERVER['SCRIPT_NAME'] : $_SERVER['SCRIPT_FILENAME']);
-  $server = explode('.', implode('.', array_reverse(explode(':', rtrim($_SERVER['HTTP_HOST'], '.')))));
+  $script = !empty($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : (isset($_SERVER['SCRIPT_FILENAME']) ? $_SERVER['SCRIPT_FILENAME'] : '/index.php');
+  $uri = explode('/', $script);
+  // PHP 8: rtrim(null) is a TypeError. HTTP_HOST is not always set.
+  $http_host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : (isset($_SERVER['SERVER_NAME']) ? $_SERVER['SERVER_NAME'] : 'localhost');
+  $server = explode('.', implode('.', array_reverse(explode(':', rtrim($http_host, '.')))));
   for ($i = count($uri) - 1; $i > 0; $i--) {
     for ($j = count($server); $j > 0; $j--) {
       $dir = implode('.', array_slice($server, -$j)) . implode('.', array_slice($uri, 0, $i));

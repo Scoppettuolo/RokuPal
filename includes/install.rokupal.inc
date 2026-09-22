@@ -2,7 +2,7 @@
 /**
  * @file
  * RokuPal installer API — used by install.php and install-simple.php.
- * Does not use the multi-task classic Drupal installer state machine.
+ * Does not use the multi-task classic multi-step installer state machine.
  */
 
 /**
@@ -19,6 +19,96 @@
  *   - enable_poll (bool)
  * @return array messages (strings)
  */
+
+/**
+ * Ensure sites/default is writable and write settings.php.
+ * Throws Exception with actionable XAMPP/Windows guidance on failure.
+ */
+function rokupal_install_write_settings($db_url) {
+  $dir = './sites/default';
+  $files_dir = './sites/default/files';
+  $settings = $dir . '/settings.php';
+  $settings_default = $dir . '/default.settings.php';
+
+  foreach (array($dir, $files_dir) as $d) {
+    if (!is_dir($d)) {
+      $ok = @mkdir($d, 0775, TRUE);
+      if (!$ok && !is_dir($d)) {
+        throw new Exception(
+          "No se pudo crear la carpeta $d.\n\n" .
+          "En XAMPP (Windows):\n" .
+          "1. Cierra el instalador.\n" .
+          "2. En el Explorador, ve a la carpeta del sitio (htdocs\\...).\n" .
+          "3. Clic derecho en 'sites' → Propiedades → desmarca 'Solo lectura' → Aplicar a subcarpetas.\n" .
+          "4. Asegurate de que exista sites\\default.\n" .
+          "5. Vuelve a abrir install.php.\n\n" .
+          "En Linux: chmod -R 775 sites"
+        );
+      }
+    }
+  }
+
+  if (is_file($settings)) {
+    $content = file_get_contents($settings);
+    if ($content === FALSE) {
+      throw new Exception("No se pudo leer $settings (permiso denegado).");
+    }
+    if (preg_match('/\$db_url\s*=/', $content)) {
+      $content = preg_replace('/\$db_url\s*=\s*[\'"].*?[\'"]\s*;/', "\$db_url = '" . addslashes($db_url) . "';", $content, 1);
+    }
+    else {
+      $content .= "\n\$db_url = '" . addslashes($db_url) . "';\n";
+    }
+  }
+  else {
+    $content = is_file($settings_default) ? file_get_contents($settings_default) : "<?php\n";
+    if ($content === FALSE) {
+      $content = "<?php\n";
+    }
+    if (!preg_match('/\$db_url\s*=/', $content)) {
+      $content .= "\n\$db_url = '" . addslashes($db_url) . "';\n\$db_prefix = '';\n";
+    }
+    else {
+      $content = preg_replace('/\$db_url\s*=\s*[\'"].*?[\'"]\s*;/', "\$db_url = '" . addslashes($db_url) . "';", $content, 1);
+    }
+    if (strpos($content, 'cookie_domain') === FALSE) {
+      $content .= "\n# \$cookie_domain = ''; // leave unset on localhost\n";
+    }
+  }
+
+  if (is_file($settings) && !is_writable($settings)) {
+    @chmod($settings, 0664);
+  }
+  if (!is_writable($dir)) {
+    @chmod($dir, 0775);
+  }
+
+  $can_write = (is_file($settings) && is_writable($settings)) || (!is_file($settings) && is_writable($dir));
+  if (!$can_write) {
+    throw new Exception(
+      "Permission denied al escribir sites/default/settings.php.\n\n" .
+      "Esto es frecuente en XAMPP (Windows).\n\n" .
+      "Solucion rapida:\n" .
+      "1. Crea sites\\default si no existe.\n" .
+      "2. Crea un archivo vacio settings.php dentro de sites\\default.\n" .
+      "3. Clic derecho en settings.php → Propiedades → desmarca Solo lectura.\n" .
+      "4. Clic derecho en la carpeta sites → Propiedades → desmarca Solo lectura → Aplicar.\n" .
+      "5. Recarga install.php.\n\n" .
+      "Si prefieres, pega manualmente en settings.php el contenido que el instalador intento escribir (incluye \$db_url)."
+    );
+  }
+
+  $written = @file_put_contents($settings, $content);
+  if ($written === FALSE) {
+    throw new Exception(
+      "file_put_contents fallo en $settings. " .
+      "Revisa permisos de escritura en sites/default (XAMPP: quita Solo lectura)."
+    );
+  }
+
+  return $settings;
+}
+
 function install_run_simple($profile, $locale, $options = array()) {
   $messages = array();
   $profile = 'rokupal';
@@ -40,41 +130,9 @@ function install_run_simple($profile, $locale, $options = array()) {
     throw new Exception('Database URL, admin name and password are required.');
   }
 
-  // --- settings.php ---
-  if (!is_dir('./sites/default')) {
-    @mkdir('./sites/default', 0775, TRUE);
-  }
-  if (!is_dir('./sites/default/files')) {
-    @mkdir('./sites/default/files', 0775, TRUE);
-  }
-  $settings = './sites/default/settings.php';
-  $settings_default = './sites/default/default.settings.php';
-  if (!is_file($settings)) {
-    $default = is_file($settings_default) ? file_get_contents($settings_default) : "<?php\n";
-    if (!preg_match('/\$db_url\s*=/', $default)) {
-      $default .= "\n\$db_url = '" . addslashes($db_url) . "';\n\$db_prefix = '';\n";
-    }
-    else {
-      $default = preg_replace('/\$db_url\s*=\s*[\'"].*?[\'"]\s*;/', "\$db_url = '" . addslashes($db_url) . "';", $default, 1);
-    }
-    // No cookie_domain on localhost
-    if (strpos($default, 'cookie_domain') === FALSE) {
-      $default .= "\n# \$cookie_domain = ''; // leave unset on localhost\n";
-    }
-    file_put_contents($settings, $default);
-    $messages[] = 'Wrote sites/default/settings.php';
-  }
-  else {
-    // Update db_url in existing settings
-    $content = file_get_contents($settings);
-    if (preg_match('/\$db_url\s*=/', $content)) {
-      $content = preg_replace('/\$db_url\s*=\s*[\'"].*?[\'"]\s*;/', "\$db_url = '" . addslashes($db_url) . "';", $content, 1);
-    }
-    else {
-      $content .= "\n\$db_url = '" . addslashes($db_url) . "';\n";
-    }
-    file_put_contents($settings, $content);
-  }
+  // --- settings.php (permisos-aware, XAMPP/Windows friendly) ---
+  $settings = rokupal_install_write_settings($db_url);
+  $messages[] = 'Wrote ' . $settings;
 
   // Load settings into global
   global $db_url, $db_prefix, $db_type, $base_url;

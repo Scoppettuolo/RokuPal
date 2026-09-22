@@ -1,0 +1,6 @@
+name = RokuPal Menus UI
+description = Improved menus manager.
+package = RokuPal
+core = 6.x
+version = "1.6.2"
+dependencies[] = rokupal_core

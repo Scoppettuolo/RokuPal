@@ -1,0 +1,6 @@
+name = RokuPal Guestbook
+description = Per-user guestbook: visitors leave messages on a profile (separate from wall). Disable or uninstall to remove.
+package = RokuPal
+core = 6.x
+version = "1.6.2"
+dependencies[] = user

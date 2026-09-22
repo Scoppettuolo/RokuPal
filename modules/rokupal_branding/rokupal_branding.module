@@ -1,0 +1,32 @@
+<?php
+/**
+ * @file
+ * Soft branding: user-visible strings that core still labels generically.
+ */
+
+/**
+ * Implements hook_requirements_alter() — not in D6.
+ * Use hook_form_alter / preprocess where possible.
+ */
+
+/**
+ * Implements hook_preprocess_page().
+ */
+function rokupal_branding_preprocess_page(&$vars) {
+  if (!empty($vars['head_title']) && is_string($vars['head_title'])) {
+    $vars['head_title'] = str_replace('Drupal', 'RokuPal', $vars['head_title']);
+  }
+  if (!empty($vars['title']) && is_string($vars['title']) && $vars['title'] === 'Drupal') {
+    $vars['title'] = 'RokuPal';
+  }
+}
+
+/**
+ * Implements hook_footer() — skip.
+ * Implements hook_help() for branding note.
+ */
+function rokupal_branding_help($section) {
+  if ($section == 'admin/help#rokupal_branding') {
+    return '<p>' . t('Adjusts visible labels so the site presents as RokuPal. Internal API functions still use the historical drupal_* names (D6 lineage).') . '</p>';
+  }
+}

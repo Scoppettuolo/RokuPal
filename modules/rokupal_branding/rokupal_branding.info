@@ -1,0 +1,6 @@
+name = RokuPal Branding
+description = Replaces leftover "Drupal" labels in admin status/help with RokuPal where safe.
+package = RokuPal
+core = 6.x
+version = "1.6.2"
+dependencies[] = system

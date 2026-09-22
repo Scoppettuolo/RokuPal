@@ -1,0 +1,42 @@
+<?php
+/**
+ * @file RokuPal Content Types UI.
+ */
+
+/**
+ * Implements hook_help().
+ */
+function rokupal_nodetype_ui_help($section) {
+  if ($section == 'admin/content/types' || strpos($section, 'admin/content/types') === 0) {
+    return '<p>' . t('Configure content types, workflow, and comments.') . '</p>';
+  }
+}
+
+
+function rokupal_nodetype_ui_menu_alter(&$items) {
+  $path = drupal_get_path('module', 'rokupal_nodetype_ui');
+  $file = 'rokupal_nodetype_ui.nodetype.inc';
+  // D6 path: admin/content/types / edit
+  foreach (array_keys($items) as $key) {
+    if (strpos($key, 'admin/content/types/') === 0 || strpos($key, 'admin/content/node-type/') === 0) {
+      if (isset($items[$key]['page callback']) && (
+          $items[$key]['page callback'] === 'node_type_form' ||
+          $items[$key]['page callback'] === 'drupal_get_form'
+        )) {
+        // Prefer full custom page for type edit when object loader present.
+      }
+    }
+  }
+  if (isset($items['admin/content/types/%node_type'])) {
+    $items['admin/content/types/%node_type']['page callback'] = 'rokupal_nodetype_ui_page';
+    $items['admin/content/types/%node_type']['page arguments'] = array(3);
+    $items['admin/content/types/%node_type']['file'] = $file;
+    $items['admin/content/types/%node_type']['file path'] = $path;
+  }
+  if (isset($items['admin/content/node-type/%node_type'])) {
+    $items['admin/content/node-type/%node_type']['page callback'] = 'rokupal_nodetype_ui_page';
+    $items['admin/content/node-type/%node_type']['page arguments'] = array(3);
+    $items['admin/content/node-type/%node_type']['file'] = $file;
+    $items['admin/content/node-type/%node_type']['file path'] = $path;
+  }
+}

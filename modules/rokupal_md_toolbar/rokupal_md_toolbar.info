@@ -1,0 +1,6 @@
+name = RokuPal Markdown Toolbar
+description = Simple B/I/code/link/list buttons above body and comment fields (Markdown). Disable or uninstall to remove.
+package = RokuPal
+core = 6.x
+version = "1.6.2"
+dependencies[] = rokupal_markdown

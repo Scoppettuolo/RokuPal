@@ -38,7 +38,89 @@ function rokupal_url($relative) {
   return $base . rokupal_theme_path() . '/' . ltrim(str_replace('\\', '/', $relative), '/');
 }
 
+
+/**
+ * Ensure theme CSS is always registered (subdirectory + cache safe).
+ */
+function rokupal_ensure_css() {
+  static $done = FALSE;
+  if ($done) {
+    return;
+  }
+  $done = TRUE;
+  // Disable aggregation once (not every request write).
+  if (function_exists('variable_get') && !variable_get('rokupal_agg_off', 0)) {
+    if (variable_get('preprocess_css', 0) || variable_get('preprocess_js', 0)) {
+      variable_set('preprocess_css', 0);
+      variable_set('preprocess_js', 0);
+    }
+    variable_set('rokupal_agg_off', 1);
+  }
+  if (!function_exists('drupal_add_css')) {
+    return;
+  }
+  $base = rokupal_theme_path();
+  // Critical CSS always.
+  $files = array(
+    $base . '/style.css',
+    $base . '/layout.css',
+    $base . '/css/base.css',
+    $base . '/css/layout.css',
+    $base . '/css/components.css',
+  );
+  // Lazy: forum CSS only on forum paths (or when forum module listing nodes).
+  $need_forum = (arg(0) === 'forum');
+  if ($need_forum) {
+    $files[] = $base . '/css/forum.css';
+  }
+  foreach ($files as $f) {
+    if (is_file($f)) {
+      drupal_add_css($f, 'theme');
+    }
+  }
+  if (is_file($base . '/js/rokupal.js') && function_exists('drupal_add_js')) {
+    drupal_add_js($base . '/js/rokupal.js', 'theme', 'footer');
+  }
+}
+
 function rokupal_preprocess_page(&$vars) {
+  rokupal_ensure_css();
+
+  // Search box in header when Search module is on.
+  $vars['search_box'] = '';
+  if (function_exists('module_exists') && module_exists('search') && user_access('search content') && function_exists('drupal_get_form')) {
+    $vars['search_box'] = drupal_get_form('search_theme_form');
+  }
+
+  // Body classes for layout/CSS hooks.
+  $classes = array('rokupal');
+  if (!empty($vars['rokupal_admin_bar'])) {
+    $classes[] = 'has-rp-admin-bar';
+  }
+  if (!empty($vars['left'])) {
+    $classes[] = 'with-sidebar-first';
+  }
+  if (!empty($vars['right'])) {
+    $classes[] = 'with-sidebar-second';
+  }
+  if (!empty($vars['is_front'])) {
+    $classes[] = 'front';
+  }
+  else {
+    $classes[] = 'not-front';
+  }
+  $vars['body_classes'] = implode(' ', $classes);
+
+
+  // Lightweight admin bar (rokupal_core)
+  $vars['rokupal_admin_bar'] = '';
+  if (function_exists('rokupal_admin_bar_render')) {
+    $vars['rokupal_admin_bar'] = rokupal_admin_bar_render();
+  }
+  elseif (function_exists('rokupal_core_admin_bar_render')) {
+    $vars['rokupal_admin_bar'] = rokupal_core_admin_bar_render();
+  }
+
   $vars['rokupal_color_css'] = '';
   // Live color palette (do not rely only on module preprocess order)
   if (function_exists('color_build_css')) {
@@ -147,17 +229,71 @@ function phptemplate_username($object) {
   $name = !empty($object->name) ? $object->name : t('Anonymous');
   $uid = isset($object->uid) ? (int) $object->uid : 0;
   $avatar = '';
-  if ($uid && function_exists('profile_user_avatar')) {
-    $avatar = profile_user_avatar($uid);
+
+  // Core user picture (user.module).
+  if ($uid && function_exists('variable_get') && variable_get('user_pictures', 0)) {
+    $account = is_object($object) ? $object : NULL;
+    if ($account && empty($account->picture) && function_exists('user_load')) {
+      $full = user_load($uid);
+      if ($full) {
+        $account = $full;
+      }
+    }
+    if (!empty($account->picture) && function_exists('theme')) {
+      // theme_user_picture expects a user object.
+      $avatar = theme('user_picture', $account);
+    }
   }
+
   if ($uid) {
-    $link = l($name, 'user/' . $uid);
+    $link = l($name, 'user/' . $uid, array('attributes' => array('class' => 'rp-username')));
   }
   else {
-    $link = check_plain($name);
+    $link = '<span class="rp-username">' . check_plain($name) . '</span>';
   }
   if ($avatar) {
-    return '<span class="rp-user">' . $avatar . ' ' . $link . '</span>';
+    return '<span class="rp-user rp-user-with-pic">' . $avatar . ' ' . $link . '</span>';
   }
-  return $link;
+  return '<span class="rp-user">' . $link . '</span>';
+}
+
+
+/**
+ * Compact search: no label, short button.
+ */
+function rokupal_preprocess_search_theme_form(&$vars) {
+  if (isset($vars['form']['search_theme_form']['#title'])) {
+    $vars['form']['search_theme_form']['#title'] = '';
+    $vars['form']['search_theme_form']['#title_display'] = 'invisible';
+  }
+  // D6 structure: form keys vary; also strip via CSS.
+  if (isset($vars['form']['submit']['#value'])) {
+    $vars['form']['submit']['#value'] = t('Go');
+  }
+}
+
+
+/**
+ * Theme override: compact header search (input + button, no label).
+ * D6 default stacks label / field / submit on three lines.
+ */
+function rokupal_search_theme_form($form) {
+  // Hide title permanently in render array.
+  if (isset($form['search_theme_form'])) {
+    unset($form['search_theme_form']['#title']);
+    $form['search_theme_form']['#title'] = '';
+  }
+  // Build minimal markup — avoid theme('form_element') which wraps label.
+  $output = '<div id="search" class="container-inline rp-search-inline">';
+  if (isset($form['search_theme_form'])) {
+    $output .= drupal_render($form['search_theme_form']);
+  }
+  if (isset($form['submit'])) {
+    $form['submit']['#value'] = t('Search');
+    $output .= drupal_render($form['submit']);
+  }
+  // Render any remaining (token, etc.) hidden.
+  $output .= drupal_render($form);
+  $output .= '</div>';
+  return $output;
 }

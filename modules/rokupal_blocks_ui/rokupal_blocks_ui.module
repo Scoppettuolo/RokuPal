@@ -1,0 +1,244 @@
+<?php
+/**
+ * @file RokuPal Blocks UI.
+ */
+
+/**
+ * Implements hook_help().
+ */
+function rokupal_blocks_ui_help($section) {
+  if ($section == 'admin/build/block' || strpos($section, 'admin/build/block') === 0) {
+    return '<p>' . t('Arrange blocks by region. Use Visual layout for drag-and-drop.') . '</p>';
+  }
+}
+
+
+function rokupal_blocks_ui_menu() {
+  $items = array();
+  $items['admin/build/block/visual'] = array(
+    'title' => 'Visual layout',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('rokupal_blocks_ui_visual_form'),
+    'access arguments' => array('administer blocks'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => -5,
+  );
+  return $items;
+}
+
+function rokupal_blocks_ui_menu_alter(&$items) {
+  $path = drupal_get_path('module', 'rokupal_blocks_ui');
+  if (isset($items['admin/build/block']) && is_file($path . '/rokupal_blocks_ui.blocks.inc')) {
+    // Optional: use custom page if desired; keep system page + our form_alter.
+  }
+}
+
+function rokupal_blocks_ui_form_alter(&$form, $form_state, $form_id) {
+  if ($form_id != 'block_admin_display_form') {
+    return;
+  }
+
+  $form['rp_blocks_ui_intro'] = array(
+    '#type' => 'markup',
+    '#value' => '<div class="rp-blocks-intro"><p>' . t('Choose a region for each block. Disabled blocks are hidden. Use <a href="@v">Visual layout</a> for drag-and-drop.', array('@v' => url('admin/build/block/visual'))) . '</p></div>',
+    '#weight' => -1000,
+  );
+
+  $path = drupal_get_path('module', 'rokupal_blocks_ui');
+  if ($path) {
+    if (is_file($path . '/css/block-admin.css')) {
+      drupal_add_css($path . '/css/block-admin.css');
+    }
+    if (is_file($path . '/js/block-admin.js')) {
+      drupal_add_js($path . '/js/block-admin.js');
+    }
+  }
+  if (is_file('misc/tabledrag.js')) {
+    drupal_add_js('misc/tabledrag.js');
+  }
+  if (is_file('misc/block.js')) {
+    drupal_add_js('misc/block.js');
+  }
+
+  $map_legacy = array(
+    'sidebar_first' => 'left',
+    'sidebar_second' => 'right',
+    'sidebar-left' => 'left',
+    'sidebar-right' => 'right',
+    'top_bar' => 'header',
+    'header_tools' => 'header',
+    'footer_message' => 'footer',
+  );
+
+  foreach (element_children($form) as $key) {
+    if (!isset($form[$key]) || !is_array($form[$key]) || !isset($form[$key]['region'])) {
+      continue;
+    }
+    $cur = isset($form[$key]['region']['#default_value']) ? $form[$key]['region']['#default_value'] : '';
+    if ($cur === NULL || $cur === -1 || $cur === '-1') {
+      $cur = '';
+    }
+    $cur = (string) $cur;
+    if (isset($map_legacy[$cur])) {
+      $cur = $map_legacy[$cur];
+    }
+    $region_options = array(
+      '' => t('- Disabled -'),
+      'header' => t('Header'),
+      'header_first' => t('Header first'),
+      'header_second' => t('Header second'),
+      'highlighted' => t('Highlighted'),
+      'content_top' => t('Content top'),
+      'content' => t('Content'),
+      'content_bottom' => t('Content bottom'),
+      'left' => t('Left sidebar'),
+      'right' => t('Right sidebar'),
+      'footer_top' => t('Footer top'),
+      'footer' => t('Footer'),
+      'footer_first' => t('Footer first'),
+      'footer_second' => t('Footer second'),
+      'footer_third' => t('Footer third'),
+    );
+    // Keep unknown current region as option so nothing is lost.
+    if ($cur !== '' && !isset($region_options[$cur])) {
+      $region_options[$cur] = $cur;
+    }
+    $form[$key]['region'] = array(
+      '#type' => 'select',
+      '#title' => t('Region'),
+      '#default_value' => $cur,
+      '#options' => $region_options,
+      '#attributes' => array('class' => 'rp-region-select'),
+    );
+    if (isset($form[$key]['weight'])) {
+      $w = isset($form[$key]['weight']['#default_value']) ? (int) $form[$key]['weight']['#default_value'] : 0;
+      $form[$key]['weight'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Weight'),
+        '#default_value' => $w,
+        '#size' => 4,
+        '#maxlength' => 5,
+      );
+    }
+  }
+  if (!isset($form['#validate']) || !is_array($form['#validate'])) {
+    $form['#validate'] = array();
+  }
+  $form['#validate'][] = 'rokupal_blocks_ui_admin_validate';
+  if (!isset($form['#submit']) || !is_array($form['#submit'])) {
+    $form['#submit'] = array();
+  }
+  $form['#submit'][] = 'rokupal_blocks_ui_admin_submit';
+  if (isset($form['submit']['#value'])) {
+    $form['submit']['#value'] = t('Save blocks');
+  }
+  $form['rokupal_visual_link'] = array(
+    '#type' => 'markup',
+    '#value' => '<p class="rp-block-admin-help">' . t('Also: <a href="@u">Visual layout</a>.', array('@u' => url('admin/build/block/visual'))) . '</p>',
+    '#weight' => -100,
+  );
+}
+
+
+/**
+ * Sanitize block admin values.
+ */
+function rokupal_blocks_ui_admin_validate($form, &$form_state) {
+  if (empty($form_state['values']) || !is_array($form_state['values'])) {
+    return;
+  }
+  $map_legacy = array(
+    'sidebar_first' => 'left',
+    'sidebar_second' => 'right',
+    'sidebar-left' => 'left',
+    'sidebar-right' => 'right',
+    'top_bar' => 'header',
+    'header_tools' => 'header',
+  );
+  foreach ($form_state['values'] as $key => $row) {
+    if (!is_array($row) || !isset($row['region'])) {
+      continue;
+    }
+    $region = $row['region'];
+    if (isset($map_legacy[$region])) {
+      $form_state['values'][$key]['region'] = $map_legacy[$region];
+    }
+  }
+}
+
+/**
+ * Persist block layout to {blocks}.
+ */
+function rokupal_blocks_ui_admin_submit($form, &$form_state) {
+  if (empty($form_state['values']) || !is_array($form_state['values'])) {
+    return;
+  }
+  $theme = variable_get('theme_default', 'rokupal');
+  $map_legacy = array(
+    'sidebar_first' => 'left',
+    'sidebar_second' => 'right',
+    'sidebar-left' => 'left',
+    'sidebar-right' => 'right',
+    'top_bar' => 'header',
+    'header_tools' => 'header',
+  );
+
+  foreach ($form_state['values'] as $key => $row) {
+    if (!is_array($row) || !isset($row['module']) || !isset($row['delta'])) {
+      continue;
+    }
+    if (isset($row['theme']) && $row['theme'] !== '') {
+      $theme = $row['theme'];
+    }
+    $module = $row['module'];
+    $delta = $row['delta'];
+    $region = isset($row['region']) ? trim($row['region']) : '';
+    if (isset($map_legacy[$region])) {
+      $region = $map_legacy[$region];
+    }
+    $weight = isset($row['weight']) ? (int) $row['weight'] : 0;
+    $throttle = isset($row['throttle']) ? (int) $row['throttle'] : 0;
+    if ($region === '' || $region === '-1') {
+      $status = 0;
+      $region = '';
+    }
+    else {
+      $status = 1;
+    }
+    db_query(
+      "UPDATE {blocks} SET status = %d, weight = %d, region = '%s', throttle = %d WHERE module = '%s' AND delta = '%s' AND theme = '%s'",
+      $status,
+      $weight,
+      $region,
+      $throttle,
+      $module,
+      $delta,
+      $theme
+    );
+  }
+  cache_clear_all();
+  drupal_set_message(t('The block settings have been updated.'));
+}
+
+/**
+ * Visual block layout form.
+ */
+function rokupal_blocks_ui_visual_form(&$form_state) {
+  $theme=variable_get('theme_default','rokupal'); $path=drupal_get_path('module','rokupal_core');
+  if($path&&is_file($path.'/css/block-admin.css'))drupal_add_css($path.'/css/block-admin.css');
+  if($path&&is_file($path.'/js/block-admin.js'))drupal_add_js($path.'/js/block-admin.js');
+  $regions=array('preheader'=>'Preheader','header'=>'Header','header_tools'=>'Header tools','highlighted'=>'Highlighted','hero'=>'Hero','content_top'=>'Content top','content'=>'Content','content_bottom'=>'Content bottom','triptych_first'=>'Triptych first','triptych_middle'=>'Triptych middle','triptych_last'=>'Triptych last','left'=>'Left sidebar','right'=>'Right sidebar','footer_top'=>'Footer top','footer'=>'Footer','footer_bottom'=>'Footer bottom',''=>'Disabled');
+  $q=db_query("SELECT * FROM {blocks} WHERE theme = '%s' ORDER BY weight, module, delta",$theme); $all=array();
+  while($b=db_fetch_array($q)){ $key=$b['module'].'|'.$b['delta']; $list=module_invoke($b['module'],'block','list'); $info=(is_array($list)&&isset($list[$b['delta']]['info']))?$list[$b['delta']]['info']:$key; $reg=!empty($b['status'])?$b['region']:''; if(!isset($regions[$reg]))$reg=''; $all[$key]=array('module'=>$b['module'],'delta'=>$b['delta'],'info'=>$info,'region'=>$reg); }
+  $html='<div class="rp-block-admin-help"><strong>'.t('Visual layout').'</strong><br/>'.t('Arrastra cada bloque entre las regiones reales y pulsa Guardar layout.').'</div><div class="rp-layout-board rp-layout-draggable">';
+  foreach($regions as $rid=>$label){$html.='<section class="rp-region-box rp-dropzone" data-region="'.check_plain($rid).'"><h2>'.t($label).'</h2><div class="rp-dropzone-items">'; foreach($all as $key=>$b){if($b['region']!==$rid)continue; $html.='<article class="rp-block-card" draggable="true" data-block-key="'.check_plain($key).'"><span class="rp-drag-handle">☷</span><strong>'.check_plain($b['info']).'</strong><small>'.check_plain($key).'</small></article>';} $html.='</div></section>';}
+  $html.='</div>'; $form=array('#tree'=>TRUE); $form['board']=array('#type'=>'markup','#value'=>$html);
+  foreach($all as $key=>$b){$form['blocks'][$key]['module']=array('#type'=>'value','#value'=>$b['module']); $form['blocks'][$key]['delta']=array('#type'=>'value','#value'=>$b['delta']); $form['blocks'][$key]['region']=array('#type'=>'hidden','#default_value'=>$b['region'],'#attributes'=>array('class'=>array('rp-block-region')));}
+  $form['theme']=array('#type'=>'value','#value'=>$theme); $form['submit']=array('#type'=>'submit','#value'=>t('Save layout')); return $form;
+}
+
+function rokupal_blocks_ui_visual_form_submit($form, &$form_state) {
+  if(empty($form_state['values']['blocks'])||!is_array($form_state['values']['blocks']))return; $theme=isset($form_state['values']['theme'])?$form_state['values']['theme']:variable_get('theme_default','rokupal'); $allowed=array('preheader','header','header_tools','highlighted','hero','content_top','content','content_bottom','triptych_first','triptych_middle','triptych_last','left','right','footer_top','footer','footer_bottom',''); $weights=array();
+  foreach($form_state['values']['blocks'] as $row){if(!is_array($row)||empty($row['module'])||!isset($row['delta']))continue; $r=isset($row['region'])?trim($row['region']):''; if(!in_array($r,$allowed,TRUE))$r=''; if(!isset($weights[$r]))$weights[$r]=0; db_query("UPDATE {blocks} SET region = '%s', status = %d, weight = %d WHERE module = '%s' AND delta = '%s' AND theme = '%s'",$r,$r===''?0:1,$weights[$r]++,$row['module'],$row['delta'],$theme);}
+  cache_clear_all(); drupal_set_message(t('Block layout saved.'));
+}

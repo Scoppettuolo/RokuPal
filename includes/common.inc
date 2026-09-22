@@ -2770,7 +2770,8 @@ function drupal_get_private_key() {
  */
 function drupal_get_token($value = '') {
   $private_key = drupal_get_private_key();
-  return md5(session_id() . $value . $private_key);
+  // HMAC-SHA256 is stronger than the original md5 construction.
+  return hash_hmac('sha256', session_id() . $value, $private_key);
 }
 
 /**
@@ -2788,7 +2789,15 @@ function drupal_get_token($value = '') {
  */
 function drupal_valid_token($token, $value = '', $skip_anonymous = FALSE) {
   global $user;
-  return (($skip_anonymous && $user->uid == 0) || ($token === md5(session_id() . $value . variable_get('drupal_private_key', ''))));
+  // HMAC-SHA256 only (same as drupal_get_token). No legacy md5.
+  if ($skip_anonymous && isset($user->uid) && (int) $user->uid === 0) {
+    return TRUE;
+  }
+  if (!is_string($token) || $token === '') {
+    return FALSE;
+  }
+  $expected = drupal_get_token($value);
+  return hash_equals($expected, $token);
 }
 
 /**

@@ -114,7 +114,7 @@ function drupal_install_profile_name() {
     if (function_exists($function)) {
       $details = $function();
     }
-    $name = isset($details['name']) ? $details['name'] : 'Drupal';
+    $name = isset($details['name']) ? $details['name'] : 'RokuPal';
   }
 
   return $name;
@@ -142,7 +142,7 @@ function drupal_detect_baseurl($file = 'install.php') {
 }
 
 /**
- * Detect all databases supported by Drupal that are compiled into the current
+ * Detect all databases supported by RokuPal that are compiled into the current
  * PHP installation.
  *
  * @return
@@ -309,7 +309,7 @@ function drupal_verify_profile($profile, $locale) {
   $function = $profile .'_profile_modules';
   $module_list = array_merge(drupal_required_modules(), $function(), ($locale != 'en' && !empty($locale) ? array('locale') : array()));
 
-  // Get a list of modules that exist in Drupal's assorted subdirectories.
+  // Get a list of modules that exist in RokuPal's module directories.
   $present_modules = array();
   foreach (drupal_system_listing('\.module$', 'modules', 'name', 0) as $present_module) {
     $present_modules[] = $present_module->name;
@@ -407,7 +407,7 @@ function drupal_install_system() {
   $system_versions = function_exists('drupal_get_schema_versions') ? drupal_get_schema_versions('system') : array();
   $system_version = $system_versions ? max($system_versions) : SCHEMA_INSTALLED;
   db_query("INSERT INTO {system} (filename, name, type, owner, status, throttle, bootstrap, schema_version) VALUES('%s', '%s', '%s', '%s', %d, %d, %d, %d)", $system_path .'/system.module', 'system', 'module', '', 1, 0, 0, $system_version);
-  // Now that we've installed things properly, bootstrap the full Drupal environment
+  // Now that we've installed things properly, bootstrap the full RokuPal environment
   drupal_bootstrap(DRUPAL_BOOTSTRAP_FULL);
   if (function_exists('module_rebuild_cache')) {
     module_rebuild_cache();
@@ -662,7 +662,7 @@ function drupal_install_fix_file($file, $mask, $message = TRUE) {
  *   An installer path.
  */
 function install_goto($path) {
-  // Keep internal redirects relative to Drupal's actual installation path.
+  // Keep internal redirects relative to RokuPal's installation path.
   // During early bootstrap base_path() is not loaded yet, although the global
   // $base_path has already been initialized by conf_init().
   global $base_path;

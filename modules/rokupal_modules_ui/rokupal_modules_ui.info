@@ -1,0 +1,6 @@
+name = RokuPal Modules UI
+description = Modern modules enable/disable/uninstall manager.
+package = RokuPal
+core = 6.x
+version = "1.6.2"
+dependencies[] = rokupal_core
